@@ -138,6 +138,7 @@ obj__van_hijfte__sample_y <- Seurat::ScaleData(
 ```{r}
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+
 obj__van_hijfte__sample_y <- Seurat::RunPCA(
   object = obj__van_hijfte__sample_y,
   features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y),
@@ -145,10 +146,19 @@ obj__van_hijfte__sample_y <- Seurat::RunPCA(
   seed.use = obj__van_hijfte__sample_y@misc$random.seed
 )
 
-Seurat::ElbowPlot(obj__van_hijfte__sample_y, ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1)
+
+Seurat::ElbowPlot(
+  object = obj__van_hijfte__sample_y,
+  ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1
+)
+
 
 # @todo add marker colors
-Seurat::VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
+Seurat::VizDimLoadings(
+  object = obj__van_hijfte__sample_y,
+  dims = 1:6,
+  reduction = "pca"
+)
 
 
 ```
@@ -157,20 +167,24 @@ Seurat::VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
 ## Clustering
 
 ```{r}
+
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+
 obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
   object = obj__van_hijfte__sample_y,
   dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components
-  )
+)
+
+
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+
 obj__van_hijfte__sample_y <- Seurat::FindClusters(
   object = obj__van_hijfte__sample_y,
   resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
-  algorithm=1,
-  random.seed  = obj__van_hijfte__sample_y@misc$random.seed
-  )
-
+  algorithm = 1,
+  random.seed = obj__van_hijfte__sample_y@misc$random.seed
+)
 
 ```
 
