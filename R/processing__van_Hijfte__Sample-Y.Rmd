@@ -78,7 +78,7 @@ obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
 ## Find if there are changes w/ respect to git
 
 ```{r}
-print(system("git status --short", intern = TRUE))
+assertthat::assert_that(system("git status --short", intern = TRUE) == "")
 ```
 
 
