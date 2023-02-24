@@ -115,18 +115,18 @@ if(length(append) > 0) {
 rm(append)
 
 
-obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
+obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
 ```
 
 ## PCA
 
 ```{r}
-obj__van_hijfte__sample_y <- RunPCA(obj__van_hijfte__sample_y, features = VariableFeatures(object = obj__van_hijfte__sample_y))
+obj__van_hijfte__sample_y <- Seurat::RunPCA(obj__van_hijfte__sample_y, features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y))
 
-ElbowPlot(obj__van_hijfte__sample_y, ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1)
+Seurat::ElbowPlot(obj__van_hijfte__sample_y, ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1)
 
 # @todo add marker colors
-VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
+Seurat::VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
 
 
 ```
@@ -135,8 +135,8 @@ VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
 ## Clustering
 
 ```{r}
-obj__van_hijfte__sample_y <- FindNeighbors(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
-obj__van_hijfte__sample_y <- FindClusters(obj__van_hijfte__sample_y,
+obj__van_hijfte__sample_y <- Seurat::FindNeighbors(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
+obj__van_hijfte__sample_y <- Seurat::FindClusters(obj__van_hijfte__sample_y,
                                           resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
                                           algorithm=1)
 
@@ -148,7 +148,7 @@ obj__van_hijfte__sample_y <- FindClusters(obj__van_hijfte__sample_y,
 
 
 ```{r}
-obj__van_hijfte__sample_y <- RunUMAP(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
+obj__van_hijfte__sample_y <- Seurat::RunUMAP(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
 ```
 
 
