@@ -5,9 +5,9 @@ cache_seurat_object <- function(object) {
   # ensure all code was committed
   if(length(system("git status --short", intern = TRUE)) == 0) {
     fn <- paste0("cache/",
-                 obj__van_hijfte__sample_y@misc$sample_name,
+                 object@misc$sample_name,
                  "__",
-                 obj__van_hijfte__sample_y@misc$git_branch,
+                 object@misc$git_branch,
                  ".Rds")
     
     object@misc$git_branch <- system("git branch --show-current", intern = TRUE)
