@@ -38,7 +38,9 @@ config <- list(
   min.nFeature_RNA = 750,
   min.nCount_RNA = 1400,
   
-  pca.informative.components = 34
+  pca.informative.components = 34,
+  
+  cluster.resolution = 0.8
 )
 
 
@@ -111,13 +113,44 @@ if(length(append) > 0) {
   obj__van_hijfte__sample_y@assays$RNA@var.features <- c(obj__van_hijfte__sample_y@assays$RNA@var.features, append)
 }
 rm(append)
+
+
+obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
 ```
 
 ## PCA
 
+```{r}
+obj__van_hijfte__sample_y <- RunPCA(obj__van_hijfte__sample_y, features = VariableFeatures(object = obj__van_hijfte__sample_y))
+
+ElbowPlot(obj__van_hijfte__sample_y, ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1)
+
+# @todo add marker colors
+VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
+
+
+```
+
+
 ## Clustering
 
+```{r}
+obj__van_hijfte__sample_y <- FindNeighbors(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
+obj__van_hijfte__sample_y <- FindClusters(obj__van_hijfte__sample_y,
+                                          resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
+                                          algorithm=1)
+
+
+```
+
+
 ## UMAP
+
+
+```{r}
+obj__van_hijfte__sample_y <- RunUMAP(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
+```
+
 
 # Annotate clusters
 
@@ -137,47 +170,6 @@ obj__van_hijfte__sample_y@misc$git_branch <- NULL
 obj__van_hijfte__sample_y@misc$git_revision <- NULL
 
 ```
-
-
-```{r}
-
-library(dplyr)
-library(Seurat)
-library(patchwork)
-
-# Load the PBMC dataset
-pbmc.data <- Read10X(data.dir = "/tmp/filtered_gene_bc_matrices/hg19/")
-# Initialize the Seurat object with the raw (non-normalized data).
-pbmc <- CreateSeuratObject(counts = pbmc.data, project = "pbmc3k", min.cells = 3, min.features = 200)
-pbmc
-
-
-pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
-
-# Visualize QC metrics as a violin plot
-VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-
-plot1 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "percent.mt")
-plot2 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
-plot1 + plot2
-
-
-pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
-
-pbmc <- NormalizeData(pbmc, normalization.method = "LogNormalize", scale.factor = 10000)
-
-pbmc <- NormalizeData(pbmc)
-
-pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
-
-# Identify the 10 most highly variable genes
-top10 <- head(VariableFeatures(pbmc), 10)
-
-# plot variable features with and without labels
-plot1 <- VariableFeaturePlot(pbmc)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
-plot1 + plot2
-
 
 
 
