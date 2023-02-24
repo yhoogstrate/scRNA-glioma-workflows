@@ -176,7 +176,8 @@ set.seed(obj__van_hijfte__sample_y@misc$random.seed)
 
 obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
   object = obj__van_hijfte__sample_y,
-  dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components
+  dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components,
+  verbose = F
 )
 
 
@@ -187,7 +188,8 @@ obj__van_hijfte__sample_y <- Seurat::FindClusters(
   object = obj__van_hijfte__sample_y,
   resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
   algorithm = 1,
-  random.seed = obj__van_hijfte__sample_y@misc$random.seed
+  random.seed = obj__van_hijfte__sample_y@misc$random.seed,
+  verbose = F
 )
 
 ```
@@ -210,7 +212,191 @@ obj__van_hijfte__sample_y <- Seurat::RunUMAP(
 ```
 
 
-# Annotate clusters
+# Annotate componentents and/or clusters
+## TAM
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "TAM") |> 
+  dplyr::pull(markers)
+
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+
+
+```
+
+## Oligodendrocytes
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "oligodendrocyte") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+
+```
+
+
+
+```{r}
+# @todo add marker colors
+Seurat::VizDimLoadings(
+  object = obj__van_hijfte__sample_y,
+  dims = 2,
+  reduction = "pca"
+)
+```
+## Neuron
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "neuron") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+
+
+## Endothelial
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "endothelial") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+
+## Pericyte
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "pericyte") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+
+## OPC (Oligodendrocyte progenitor cell)
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "OPC") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+
+## Cycling cells
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "Cell cycling") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+## Tumor
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "Tumor") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+## Astrocyte
+
+```{r}
+tmp <- celltype_markers |> 
+  dplyr::filter(celltype == "Astrocyte") |> 
+  dplyr::pull(markers)
+
+plt <- geneset_component_association(
+  object = obj__van_hijfte__sample_y,
+  features = tmp,
+  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
+  dplyr::mutate(score = -log10(plt$p.val))
+
+ggplot(plt, aes(x=PC, y=score)) +
+  geom_point()
+
+```
+
+
+
+
 
 # Store object
 
@@ -225,6 +411,23 @@ cache_seurat_object(obj__van_hijfte__sample_y)
 
 # Visualizations
 
+```{r}
+FeaturePlot(obj__van_hijfte__sample_y, features=c("TMEM144"))
 
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "MOG")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "PLP1")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TMEM144")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TMEM125")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "ABCB1")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "CD34")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "FLT4")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TIE1") # meh
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "ITGA1") # endo + peri?
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "RGS5")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "PDGFRB")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "CD248")
+
+
+```
 
 
