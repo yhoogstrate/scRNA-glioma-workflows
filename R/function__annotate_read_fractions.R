@@ -8,11 +8,7 @@ annotate_read_fractions <- function(seurat_object) {
   
   for(slot in names(loop)) {
     regex <- loop[[slot]]
-    print(slot)
-    print(regex)
-    print("")
-    
-    
+
     target_features <- seurat_object |>
       row.names() |>
       data.frame(hugo_symbol = _) |>

@@ -14,6 +14,9 @@ library(ggplot2)
 
 #source('R/function__remove_doublets.R')
 source('R/function__annotate_read_fractions.R')
+
+
+source('R/load__celltype_markers.R')
 ```
 
 
@@ -96,8 +99,18 @@ obj__van_hijfte__sample_y <- subset(x = obj__van_hijfte__sample_y, subset =
 
 ```{r}
 obj__van_hijfte__sample_y <- Seurat::NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
+
 obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = obj__van_hijfte__sample_y@misc$seurat.vst.nfeatures)
-obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
+
+
+
+# Append known marker genes to the variable features
+append <- intersect(setdiff(celltype_markers$markers, obj__van_hijfte__sample_y@assays$RNA@var.features), rownames(obj__van_hijfte__sample_y))
+if(length(append) > 0) {
+  message(paste0("Appending ", length(append), " marker genes to variable features"))
+  obj__van_hijfte__sample_y@assays$RNA@var.features <- c(obj__van_hijfte__sample_y@assays$RNA@var.features, append)
+}
+rm(append)
 ```
 
 ## PCA
@@ -124,4 +137,48 @@ obj__van_hijfte__sample_y@misc$git_branch <- NULL
 obj__van_hijfte__sample_y@misc$git_revision <- NULL
 
 ```
+
+
+```{r}
+
+library(dplyr)
+library(Seurat)
+library(patchwork)
+
+# Load the PBMC dataset
+pbmc.data <- Read10X(data.dir = "/tmp/filtered_gene_bc_matrices/hg19/")
+# Initialize the Seurat object with the raw (non-normalized data).
+pbmc <- CreateSeuratObject(counts = pbmc.data, project = "pbmc3k", min.cells = 3, min.features = 200)
+pbmc
+
+
+pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
+
+# Visualize QC metrics as a violin plot
+VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+plot1 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "percent.mt")
+plot2 <- FeatureScatter(pbmc, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+plot1 + plot2
+
+
+pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
+
+pbmc <- NormalizeData(pbmc, normalization.method = "LogNormalize", scale.factor = 10000)
+
+pbmc <- NormalizeData(pbmc)
+
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(pbmc), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(pbmc)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+
+
+
 
