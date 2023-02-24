@@ -14,6 +14,7 @@ library(ggplot2)
 
 #source('R/function__remove_doublets.R')
 source('R/function__annotate_read_fractions.R')
+source('R/function__cache_seurat_object.R')
 
 
 source('R/load__celltype_markers.R')
@@ -213,18 +214,8 @@ obj__van_hijfte__sample_y <- Seurat::RunUMAP(
 ## Check git code changes and save
 
 ```{r}
-# ensure all code was committed
-assertthat::assert_that(length(system("git status --short", intern = TRUE)) == 0)
-
-obj__van_hijfte__sample_y@misc$git_branch <- system("git branch --show-current", intern = TRUE)
-obj__van_hijfte__sample_y@misc$git_revision <- system("git rev-parse --short HEAD", intern = TRUE)
-saveRDS(obj__van_hijfte__sample_y,
-       file=paste0("cache/",obj__van_hijfte__sample_y@misc$sample_name,"__",obj__van_hijfte__sample_y@misc$git_branch,".Rds"))
-obj__van_hijfte__sample_y@misc$git_branch <- NULL
-obj__van_hijfte__sample_y@misc$git_revision <- NULL
-
+cache_seurat_object(obj__van_hijfte__sample_y)
 ```
-
 
 
 
