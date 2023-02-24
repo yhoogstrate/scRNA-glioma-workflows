@@ -45,10 +45,13 @@ config <- list(
 )
 
 
-obj__van_hijfte__sample_y <- Seurat::Read10X(data.dir = config$path) |> 
-  Seurat::CreateSeuratObject(min.cells = config$seurat.min.cells,
-                             min.features = config$seurat.min.features,
-                             project = config$sample_name)
+obj__van_hijfte__sample_y <- Seurat::Read10X(
+  data.dir = config$path
+) |> Seurat::CreateSeuratObject(
+  min.cells = config$seurat.min.cells,
+  min.features = config$seurat.min.features,
+  project = config$sample_name
+)
 
 obj__van_hijfte__sample_y@misc <- config
 
