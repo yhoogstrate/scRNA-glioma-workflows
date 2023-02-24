@@ -28,7 +28,7 @@ config <- list(
   sample_name = 'van Hijfte dataset - Sample Y',
   path = "data/van_Hijfte__Sample_Y/filtered_feature_bc_matrix",
   
-  random.seed = 1,
+  random.seed = 42, # don't ask me but you can guess why, its Seurats default
   
   seurat.min.cells = 3,
   seurat.min.features = 200,
@@ -121,7 +121,12 @@ obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
 ## PCA
 
 ```{r}
-obj__van_hijfte__sample_y <- Seurat::RunPCA(obj__van_hijfte__sample_y, features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y), verbose=F, seed.use=obj__van_hijfte__sample_y@misc$random.seed)
+obj__van_hijfte__sample_y <- Seurat::RunPCA(
+  object = obj__van_hijfte__sample_y,
+  features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y),
+  verbose = F,
+  seed.use = obj__van_hijfte__sample_y@misc$random.seed
+)
 
 Seurat::ElbowPlot(obj__van_hijfte__sample_y, ndims = round(obj__van_hijfte__sample_y@misc$pca.informative.components * 4/3) + 1)
 
@@ -135,10 +140,16 @@ Seurat::VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
 ## Clustering
 
 ```{r}
-obj__van_hijfte__sample_y <- Seurat::FindNeighbors(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
-obj__van_hijfte__sample_y <- Seurat::FindClusters(obj__van_hijfte__sample_y,
-                                          resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
-                                          algorithm=1)
+obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
+  object = obj__van_hijfte__sample_y,
+  dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components
+  )
+obj__van_hijfte__sample_y <- Seurat::FindClusters(
+  object = obj__van_hijfte__sample_y,
+  resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
+  algorithm=1,
+  random.seed  = obj__van_hijfte__sample_y@misc$random.seed
+  )
 
 
 ```
@@ -148,7 +159,11 @@ obj__van_hijfte__sample_y <- Seurat::FindClusters(obj__van_hijfte__sample_y,
 
 
 ```{r}
-obj__van_hijfte__sample_y <- Seurat::RunUMAP(obj__van_hijfte__sample_y, dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components)
+obj__van_hijfte__sample_y <- Seurat::RunUMAP(
+  object = obj__van_hijfte__sample_y,
+  dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components,
+  seed.use = obj__van_hijfte__sample_y@misc$random.seed
+  )
 ```
 
 
