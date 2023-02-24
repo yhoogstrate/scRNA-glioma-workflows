@@ -78,7 +78,7 @@ obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
 ## Find if there are changes w/ respect to git
 
 ```{r}
-git_rev(system("git status --short", intern = TRUE))
+print(system("git status --short", intern = TRUE))
 ```
 
 
