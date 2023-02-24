@@ -100,9 +100,21 @@ obj__van_hijfte__sample_y <- subset(x = obj__van_hijfte__sample_y, subset =
 ## Scale / normalize
 
 ```{r}
-obj__van_hijfte__sample_y <- Seurat::NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+obj__van_hijfte__sample_y <- Seurat::NormalizeData(
+  object = obj__van_hijfte__sample_y, 
+  normalization.method = "LogNormalize", 
+  scale.factor = 1e4,
+  verbose = F
+  )
 
-obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = obj__van_hijfte__sample_y@misc$seurat.vst.nfeatures)
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(
+  object = obj__van_hijfte__sample_y,
+  selection.method = "vst",
+  nfeatures = obj__van_hijfte__sample_y@misc$seurat.vst.nfeatures,
+  verbose = F
+)
 
 
 
@@ -115,12 +127,17 @@ if(length(append) > 0) {
 rm(append)
 
 
-obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
+obj__van_hijfte__sample_y <- Seurat::ScaleData(
+  object = obj__van_hijfte__sample_y,
+  verbose = T
+  )
 ```
 
 ## PCA
 
 ```{r}
+
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
 obj__van_hijfte__sample_y <- Seurat::RunPCA(
   object = obj__van_hijfte__sample_y,
   features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y),
@@ -140,10 +157,13 @@ Seurat::VizDimLoadings(obj__van_hijfte__sample_y, dims = 1:6, reduction = "pca")
 ## Clustering
 
 ```{r}
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
 obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
   object = obj__van_hijfte__sample_y,
   dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components
   )
+
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
 obj__van_hijfte__sample_y <- Seurat::FindClusters(
   object = obj__van_hijfte__sample_y,
   resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
@@ -159,11 +179,16 @@ obj__van_hijfte__sample_y <- Seurat::FindClusters(
 
 
 ```{r}
+
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
+
 obj__van_hijfte__sample_y <- Seurat::RunUMAP(
   object = obj__van_hijfte__sample_y,
   dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components,
-  seed.use = obj__van_hijfte__sample_y@misc$random.seed
-  )
+  seed.use = obj__van_hijfte__sample_y@misc$random.seed,
+  verbose = F
+)
+
 ```
 
 
