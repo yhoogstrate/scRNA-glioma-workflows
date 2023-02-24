@@ -7,24 +7,84 @@ author:
 date: "`r BiocStyle::doc_date()`"
 ---
 
+# Config
+
 ```{r}
-source('R/function__remove_doublets.R')
+conf__van_hijfte__sample_y <- list(
+  sample_name = 'van Hijfte dataset - Sample Y',
+  random.seed = 1,
+  
+  seurat.min.cells = 3,
+  seurat.min.features = 200,
+  
+  min.nFeature_RNA = 750,
+  min.nCount_RNA = 1400,
+  
+  pca.informative.components = 34
+)
+
+set.seed(conf__van_hijfte__sample_y$random.seed)
+stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
+```
+
+# Load functions
+
+```{r}
+#source('R/function__remove_doublets.R')
 source('R/function__annotate_read_fractions.R')
 ```
 
 
+# Import data
+
 ```{r}
-sample_name <- 'van Hijfte dataset - Sample Y'
 obj__van_hijfte__sample_y <- Seurat::Read10X(data.dir = "data/van_Hijfte__Sample_Y/filtered_feature_bc_matrix") |> 
   Seurat::CreateSeuratObject(min.cells = 3, min.features = 200, project = sample_name)
 ```
-
-Adds fraction MT expression - should be put in a function
-Same should be done for rRNA
+# Annotate fractions rRNA and MT-RNA
 
 ```{r}
 obj__van_hijfte__sample_y <- annotate_read_fractions(obj__van_hijfte__sample_y) # percentage MT, Ribo RNA and MALAT1
+```
 
-Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("nFeature_RNA", "nCount_RNA", "percentage_mitochondrial_reads", "percentage_ribosomal_reads", "percentage_MALAT1_reads"), ncol = 3, pt.size = 0.01, group.by = "orig.ident") 
+# Q/C
+## Exclude low-res cells
+
+```{r}
+Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("percentage_ribosomal_reads", "percentage_MALAT1_reads"), ncol = 3, pt.size = 0.01, group.by = "orig.ident")
+
+Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("nFeature_RNA", "nCount_RNA","percentage_mitochondrial_reads"), ncol = 2, pt.size = 0.01, group.by = "orig.ident")
+```
+
+# Normalize and cluster/UMAP
+## Scale / normalize
+
+```{r}
+obj__van_hijfte__sample_y <- NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
+obj__van_hijfte__sample_y <- FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = 2000)
+obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
+```
+
+## PCA
+
+## Clustering
+
+## UMAP
+
+# Annotate clusters
+
+# Store object
+
+## Find if there are changes w/ respect to git
+
+```{r}
+git_rev(system("git status --short", intern = TRUE))
+```
+
+
+
+## Create identifier and store this into the to-be-saved object
+```{r}
+git_rev(system("git rev-parse --short HEAD", intern = TRUE))
 ```
 
