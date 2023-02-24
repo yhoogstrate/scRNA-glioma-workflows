@@ -17,6 +17,8 @@ conf__van_hijfte__sample_y <- list(
   seurat.min.cells = 3,
   seurat.min.features = 200,
   
+  seurat.vst.nfeatures = 2000,
+  
   min.nFeature_RNA = 750,
   min.nCount_RNA = 1400,
   
@@ -30,6 +32,8 @@ stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
 # Load functions
 
 ```{r}
+library(ggplot2)
+
 #source('R/function__remove_doublets.R')
 source('R/function__annotate_read_fractions.R')
 ```
@@ -39,7 +43,9 @@ source('R/function__annotate_read_fractions.R')
 
 ```{r}
 obj__van_hijfte__sample_y <- Seurat::Read10X(data.dir = "data/van_Hijfte__Sample_Y/filtered_feature_bc_matrix") |> 
-  Seurat::CreateSeuratObject(min.cells = 3, min.features = 200, project = sample_name)
+  Seurat::CreateSeuratObject(min.cells = conf__van_hijfte__sample_y$seurat.min.cells,
+                             min.features = conf__van_hijfte__sample_y$seurat.min.features,
+                             project = conf__van_hijfte__sample_y$sample_name)
 ```
 # Annotate fractions rRNA and MT-RNA
 
@@ -56,13 +62,36 @@ Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("percentage_rib
 Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("nFeature_RNA", "nCount_RNA","percentage_mitochondrial_reads"), ncol = 2, pt.size = 0.01, group.by = "orig.ident")
 ```
 
+
+```{r}
+ggplot(obj__van_hijfte__sample_y@meta.data, aes(y=`nFeature_RNA`, x=orig.ident)) +
+  geom_jitter(cex=0.01) +
+  geom_hline(yintercept = conf__van_hijfte__sample_y$min.nFeature_RNA, col="red") +
+  geom_hline(yintercept = 4500,col="red")
+
+ggplot(obj__van_hijfte__sample_y@meta.data, aes(y=`nCount_RNA`, x=orig.ident)) +
+  geom_jitter(cex=0.01)  +
+  geom_hline(yintercept = conf__van_hijfte__sample_y$min.nCount_RNA, col="red") +
+  geom_hline(yintercept = 14000,col="red")
+  #scale_y_log10()
+
+obj__van_hijfte__sample_y <- subset(x = obj__van_hijfte__sample_y, subset = 
+                     nFeature_RNA >= conf__van_hijfte__sample_y$min.nFeature_RNA &
+                     nCount_RNA >= conf__van_hijfte__sample_y$min.nCount_RNA
+                     #nFeature_RNA < 4500 & 
+                     #nCount_RNA < 14000 &
+                     #percent.mito < 0.025
+)
+```
+
+
 # Normalize and cluster/UMAP
 ## Scale / normalize
 
 ```{r}
-obj__van_hijfte__sample_y <- NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
-obj__van_hijfte__sample_y <- FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = 2000)
-obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
+obj__van_hijfte__sample_y <- Seurat::NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
+obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = conf__van_hijfte__sample_y$seurat.vst.nfeatures)
+obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
 ```
 
 ## PCA
@@ -75,7 +104,7 @@ obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
 
 # Store object
 
-## Check git code changes
+## Check git code changes and save
 
 ```{r}
 # ensure all code was committed
@@ -87,7 +116,6 @@ saveRDS(obj__van_hijfte__sample_y,
        file=paste0("cache/",conf__van_hijfte__sample_y$sample_name,"__",obj__van_hijfte__sample_y@misc$git_branch,".Rds"))
 obj__van_hijfte__sample_y@misc$git_branch <- NULL
 obj__van_hijfte__sample_y@misc$git_revision <- NULL
-
 
 ```
 
