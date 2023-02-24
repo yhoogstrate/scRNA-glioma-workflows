@@ -7,11 +7,24 @@ author:
 date: "`r BiocStyle::doc_date()`"
 ---
 
-# Config
+# Load libraries and functions
 
 ```{r}
-conf__van_hijfte__sample_y <- list(
+library(ggplot2)
+
+#source('R/function__remove_doublets.R')
+source('R/function__annotate_read_fractions.R')
+```
+
+
+# Import data & set config
+
+```{r}
+
+config <- list(
   sample_name = 'van Hijfte dataset - Sample Y',
+  path = "data/van_Hijfte__Sample_Y/filtered_feature_bc_matrix",
+  
   random.seed = 1,
   
   seurat.min.cells = 3,
@@ -25,28 +38,21 @@ conf__van_hijfte__sample_y <- list(
   pca.informative.components = 34
 )
 
-set.seed(conf__van_hijfte__sample_y$random.seed)
+
+obj__van_hijfte__sample_y <- Seurat::Read10X(data.dir = config$path) |> 
+  Seurat::CreateSeuratObject(min.cells = config$seurat.min.cells,
+                             min.features = config$seurat.min.features,
+                             project = config$sample_name)
+
+obj__van_hijfte__sample_y@misc <- config
+
+
+rm(config)
+
+set.seed(obj__van_hijfte__sample_y@misc$random.seed)
 stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
 ```
 
-# Load functions
-
-```{r}
-library(ggplot2)
-
-#source('R/function__remove_doublets.R')
-source('R/function__annotate_read_fractions.R')
-```
-
-
-# Import data
-
-```{r}
-obj__van_hijfte__sample_y <- Seurat::Read10X(data.dir = "data/van_Hijfte__Sample_Y/filtered_feature_bc_matrix") |> 
-  Seurat::CreateSeuratObject(min.cells = conf__van_hijfte__sample_y$seurat.min.cells,
-                             min.features = conf__van_hijfte__sample_y$seurat.min.features,
-                             project = conf__van_hijfte__sample_y$sample_name)
-```
 # Annotate fractions rRNA and MT-RNA
 
 ```{r}
@@ -66,18 +72,18 @@ Seurat::VlnPlot(object = obj__van_hijfte__sample_y, features = c("nFeature_RNA",
 ```{r}
 ggplot(obj__van_hijfte__sample_y@meta.data, aes(y=`nFeature_RNA`, x=orig.ident)) +
   geom_jitter(cex=0.01) +
-  geom_hline(yintercept = conf__van_hijfte__sample_y$min.nFeature_RNA, col="red") +
+  geom_hline(yintercept = obj__van_hijfte__sample_y@misc$min.nFeature_RNA, col="red") +
   geom_hline(yintercept = 4500,col="red")
 
 ggplot(obj__van_hijfte__sample_y@meta.data, aes(y=`nCount_RNA`, x=orig.ident)) +
   geom_jitter(cex=0.01)  +
-  geom_hline(yintercept = conf__van_hijfte__sample_y$min.nCount_RNA, col="red") +
+  geom_hline(yintercept = obj__van_hijfte__sample_y@misc$min.nCount_RNA, col="red") +
   geom_hline(yintercept = 14000,col="red")
   #scale_y_log10()
 
 obj__van_hijfte__sample_y <- subset(x = obj__van_hijfte__sample_y, subset = 
-                     nFeature_RNA >= conf__van_hijfte__sample_y$min.nFeature_RNA &
-                     nCount_RNA >= conf__van_hijfte__sample_y$min.nCount_RNA
+                     nFeature_RNA >= obj__van_hijfte__sample_y@misc$min.nFeature_RNA &
+                     nCount_RNA >= obj__van_hijfte__sample_y@misc$min.nCount_RNA
                      #nFeature_RNA < 4500 & 
                      #nCount_RNA < 14000 &
                      #percent.mito < 0.025
@@ -90,7 +96,7 @@ obj__van_hijfte__sample_y <- subset(x = obj__van_hijfte__sample_y, subset =
 
 ```{r}
 obj__van_hijfte__sample_y <- Seurat::NormalizeData(object = obj__van_hijfte__sample_y, normalization.method = "LogNormalize", scale.factor = 1e4)
-obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = conf__van_hijfte__sample_y$seurat.vst.nfeatures)
+obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(object = obj__van_hijfte__sample_y, selection.method = "vst", nfeatures = obj__van_hijfte__sample_y@misc$seurat.vst.nfeatures)
 obj__van_hijfte__sample_y <- Seurat::ScaleData(obj__van_hijfte__sample_y)
 ```
 
@@ -113,7 +119,7 @@ assertthat::assert_that(length(system("git status --short", intern = TRUE)) == 0
 obj__van_hijfte__sample_y@misc$git_branch <- system("git branch --show-current", intern = TRUE)
 obj__van_hijfte__sample_y@misc$git_revision <- system("git rev-parse --short HEAD", intern = TRUE)
 saveRDS(obj__van_hijfte__sample_y,
-       file=paste0("cache/",conf__van_hijfte__sample_y$sample_name,"__",obj__van_hijfte__sample_y@misc$git_branch,".Rds"))
+       file=paste0("cache/",obj__van_hijfte__sample_y@misc$sample_name,"__",obj__van_hijfte__sample_y@misc$git_branch,".Rds"))
 obj__van_hijfte__sample_y@misc$git_branch <- NULL
 obj__van_hijfte__sample_y@misc$git_revision <- NULL
 
