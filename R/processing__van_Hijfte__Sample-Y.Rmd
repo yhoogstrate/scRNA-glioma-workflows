@@ -75,16 +75,19 @@ obj__van_hijfte__sample_y <- ScaleData(obj__van_hijfte__sample_y)
 
 # Store object
 
-## Find if there are changes w/ respect to git
+## Check git code changes
 
 ```{r}
-assertthat::assert_that(system("git status --short", intern = TRUE) == "")
-```
+# ensure all code was committed
+assertthat::assert_that(length(system("git status --short", intern = TRUE)) == 0)
+
+obj__van_hijfte__sample_y@misc$git_branch <- system("git branch --show-current", intern = TRUE)
+obj__van_hijfte__sample_y@misc$git_revision <- system("git rev-parse --short HEAD", intern = TRUE)
+ggsave(obj__van_hijfte__sample_y,
+       file=paste0("cache/",conf__van_hijfte__sample_y$sample_name,"__",obj__van_hijfte__sample_y@misc$git_branch,".Rds"))
+obj__van_hijfte__sample_y@misc$git_branch <- NULL
+obj__van_hijfte__sample_y@misc$git_revision <- NULL
 
 
-
-## Create identifier and store this into the to-be-saved object
-```{r}
-git_rev(system("git rev-parse --short HEAD", intern = TRUE))
 ```
 
