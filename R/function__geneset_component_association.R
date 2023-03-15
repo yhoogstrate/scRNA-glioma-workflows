@@ -18,3 +18,36 @@ geneset_component_association <- function(object, features, k.components) {
   
   return(df)
 }
+
+
+
+
+geneset_component_associations <- function(object, celltype_markers, k.components) {
+  
+  celltypes <- celltype_markers |>
+    dplyr::select(celltype) |> 
+    dplyr::arrange(celltype) |> 
+    dplyr::distinct() |> 
+    dplyr::pull(celltype)
+  
+  df <- data.frame(
+    sapply(celltypes, function(cell.type, k.components) {
+
+      features <- celltype_markers |> 
+        dplyr::filter(celltype == cell.type) |> 
+        dplyr::pull(markers)
+
+      out <- geneset_component_association(object, features, k.components)
+      out.list <- out$p.val
+      names(out.list) <- out$PC.name
+      
+      return (out.list)
+    }, k.components), check.names=F
+  )
+  
+  
+  return (df)
+}
+
+
+

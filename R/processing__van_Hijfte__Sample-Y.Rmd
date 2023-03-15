@@ -41,7 +41,7 @@ config <- list(
   
   pca.informative.components = 34,
   
-  cluster.resolution = 0.8
+  cluster.resolution = 1.2
 )
 
 
@@ -54,6 +54,7 @@ obj__van_hijfte__sample_y <- Seurat::Read10X(
 )
 
 obj__van_hijfte__sample_y@misc <- config
+obj__van_hijfte__sample_y$celltype <- NA
 
 
 rm(config)
@@ -66,6 +67,22 @@ stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
 
 ```{r}
 obj__van_hijfte__sample_y <- annotate_read_fractions(obj__van_hijfte__sample_y) # percentage MT, Ribo RNA and MALAT1
+
+
+
+obj__van_hijfte__sample_y$percentage_mitochondrial_reads_scale <- log((obj__van_hijfte__sample_y$percentage_mitochondrial_reads * 500) + 1)
+
+obj__van_hijfte__sample_y$percentage_MALAT1_reads_scale <- log((obj__van_hijfte__sample_y$percentage_mitochondrial_reads * 500) + 1)
+
+obj__van_hijfte__sample_y$percentage_ribosomal_reads_scale <- log((obj__van_hijfte__sample_y$percentage_ribosomal_reads * 100) + 1)
+
+
+obj__van_hijfte__sample_y[['nCount_RNA_scale']] <- log(obj__van_hijfte__sample_y$nCount_RNA / 100)
+
+obj__van_hijfte__sample_y[['nFeature_RNA_scale']] <- log(obj__van_hijfte__sample_y$nFeature_RNA / 100)
+
+
+
 ```
 
 # Q/C
@@ -121,14 +138,14 @@ obj__van_hijfte__sample_y <- Seurat::FindVariableFeatures(
 )
 
 
-
+# Don't do this -- every update of the marker genes file will trigger new umap (+ annotation)
 # Append known marker genes to the variable features
-append <- intersect(setdiff(celltype_markers$markers, obj__van_hijfte__sample_y@assays$RNA@var.features), rownames(obj__van_hijfte__sample_y))
-if(length(append) > 0) {
-  message(paste0("Appending ", length(append), " marker genes to variable features"))
-  obj__van_hijfte__sample_y@assays$RNA@var.features <- c(obj__van_hijfte__sample_y@assays$RNA@var.features, append)
-}
-rm(append)
+# append <- intersect(setdiff(celltype_markers$markers, obj__van_hijfte__sample_y@assays$RNA@var.features), rownames(obj__van_hijfte__sample_y))
+# if(length(append) > 0) {
+#   message(paste0("Appending ", length(append), " marker genes to variable features"))
+#   obj__van_hijfte__sample_y@assays$RNA@var.features <- c(obj__van_hijfte__sample_y@assays$RNA@var.features, append)
+# }
+# rm(append)
 
 
 obj__van_hijfte__sample_y <- Seurat::ScaleData(
@@ -142,8 +159,8 @@ obj__van_hijfte__sample_y <- Seurat::ScaleData(
 ```{r}
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
-
 obj__van_hijfte__sample_y <- Seurat::RunPCA(
+  reduction.key = "PC_",
   object = obj__van_hijfte__sample_y,
   features = Seurat::VariableFeatures(object = obj__van_hijfte__sample_y),
   verbose = F,
@@ -165,6 +182,16 @@ Seurat::VizDimLoadings(
 )
 
 
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "pca")
+
+
+
+# add pca with reversely signed loadings and reversely signated values
+obj__van_hijfte__sample_y@reductions$invpca <- obj__van_hijfte__sample_y@reductions$pca
+obj__van_hijfte__sample_y@reductions$invpca@feature.loadings <- obj__van_hijfte__sample_y@reductions$invpca@feature.loadings * -1
+obj__van_hijfte__sample_y@reductions$invpca@cell.embeddings <- obj__van_hijfte__sample_y@reductions$invpca@cell.embeddings * -1
+Seurat::Key(obj__van_hijfte__sample_y@reductions$invpca) <- "PCinv_"
+
 ```
 
 
@@ -173,7 +200,6 @@ Seurat::VizDimLoadings(
 ```{r}
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
-
 obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
   object = obj__van_hijfte__sample_y,
   dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components,
@@ -183,7 +209,6 @@ obj__van_hijfte__sample_y <- Seurat::FindNeighbors(
 
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
-
 obj__van_hijfte__sample_y <- Seurat::FindClusters(
   object = obj__van_hijfte__sample_y,
   resolution = obj__van_hijfte__sample_y@misc$cluster.resolution,
@@ -192,210 +217,2040 @@ obj__van_hijfte__sample_y <- Seurat::FindClusters(
   verbose = F
 )
 
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "pca", label = TRUE, pt.size = .6, group.by = "seurat_clusters")
+
+
+
+
 ```
 
 
 ## UMAP
 
-
 ```{r}
 
 set.seed(obj__van_hijfte__sample_y@misc$random.seed)
-
 obj__van_hijfte__sample_y <- Seurat::RunUMAP(
   object = obj__van_hijfte__sample_y,
   dims = 1:obj__van_hijfte__sample_y@misc$pca.informative.components,
   seed.use = obj__van_hijfte__sample_y@misc$random.seed,
-  verbose = F
+  verbose = T
 )
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap")
+
 
 ```
 
+# Annotate cells manually
 
-# Annotate componentents and/or clusters
 ## TAM
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "TAM") |> 
-  dplyr::pull(markers)
-
-
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
-
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
-
-
-
-```
-
-## Oligodendrocytes
-
-```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "oligodendrocyte") |> 
-  dplyr::pull(markers)
-
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
-
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
-
-
-```
-
-
-
-```{r}
-# @todo add marker colors
-Seurat::VizDimLoadings(
-  object = obj__van_hijfte__sample_y,
-  dims = 2,
-  reduction = "pca"
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "TAM") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
 )
+
+
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(7,17,16,9,20),"TAM",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
 ```
-## Neuron
+
+## oligodendrocyte
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "neuron") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "oligodendrocyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(3,5,15,25),"oligodendrocyte",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
 
 ```
 
 
-
-## Endothelial
+## tumor
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "endothelial") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "tumor") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(14,13,11,6,4,21,12,2,10,8,0,1),"tumor",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
+
+# list top 10 markers
+#m.t <- FindMarkers(obj__van_hijfte__sample_y, ident.1 = "tumor",group.by="celltype")
+
+
 
 ```
 
 
-## Pericyte
+## OPC
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "pericyte") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "OPC") |> 
+    dplyr::pull(markers) |> 
+    head(n = 8),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+opc.names <- c(
+  "AGGCTGCGTAACGCGA-1", "ATCACGAGTAGTCACT-1",
+  "CACTGTCCAAGTGGCA-1", "CCCTTAGAGTGCTAGG-1",
+  "CGTGAATAGAGCAACC-1", "CTTCAATCAGCGCGTT-1", 
+  "GACTCTCAGAGCCGAT-1", "TGATCTTAGAGCTTTC-1", 
+  "TTCCACGTCTCGTGAA-1", "TTGGATGGTGGTCAAG-1")
+obj__van_hijfte__sample_y$celltype = ifelse(colnames(obj__van_hijfte__sample_y) %in% opc.names,"OPC",obj__van_hijfte__sample_y$celltype)
+rm(opc.names)
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
 
 ```
 
-
-## OPC (Oligodendrocyte progenitor cell)
+## astrocyte
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "OPC") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "astrocyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(24),"astrocyte",obj__van_hijfte__sample_y$celltype)
+
+
+DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
 
 ```
 
 
-## Cycling cells
+## neuron
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "Cell cycling") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "neuron") |> 
+    dplyr::pull(markers) |> 
+    head(n = 6),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(23),"neuron",obj__van_hijfte__sample_y$celltype)
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
 
 ```
 
-## Tumor
+
+
+## endothelial
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "Tumor") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "endothelial") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(19),"endothelial",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
 
 ```
 
-## Astrocyte
+
+## pericyte
 
 ```{r}
-tmp <- celltype_markers |> 
-  dplyr::filter(celltype == "Astrocyte") |> 
-  dplyr::pull(markers)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "pericyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T
+)
 
-plt <- geneset_component_association(
-  object = obj__van_hijfte__sample_y,
-  features = tmp,
-  k.components = obj__van_hijfte__sample_y@misc$pca.informative.components) |> 
-  dplyr::mutate(score = -log10(plt$p.val))
 
-ggplot(plt, aes(x=PC, y=score)) +
-  geom_point()
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(18),"pericyte",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## T-cell
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "T-cell") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+
+
+obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(26),"T-cell",obj__van_hijfte__sample_y$celltype)
+
+
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## Visualize
+
+
+
+```{r}
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+```
+
+
+
+# Annotate componentents and/or clusters
+
+```{r}
+
+
+df <- -log10(geneset_component_associations(
+  obj__van_hijfte__sample_y, 
+  celltype_markers, 
+  obj__van_hijfte__sample_y@misc$pca.informative.components
+  ))
+
+plt <- df |>
+  tibble::rownames_to_column('PC')  |> 
+  dplyr::mutate(order = as.numeric(gsub("^PC", "", PC))) |> 
+  tidyr::pivot_longer(cols = -c('PC', 'order'), names_to = 'celltype') |> 
+  dplyr::mutate(alpha = value > -log10(0.01))
+
+
+ggplot(plt, aes(x=reorder(PC, order), y=value, fill=celltype, alpha=alpha)) +
+  geom_bar(stat = "identity", position = "stack")
+
+```
+
+
+```{r}
+ee <- data.frame()
+for (pc in 1:34) {
+  obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc]
+
+  t <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "tumor"]
+  
+  tam <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "TAM"]
+  
+  pe <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "pericyte"]
+  
+  en <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "endothelial"]
+
+    ne <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "neuron"]
+    
+  tc <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "T-cell"]
+  od <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "oligodendrocyte"]
+  ac <- obj__van_hijfte__sample_y@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__sample_y$celltype == "astrocyte"]
+
+  stats.t <- c(
+    t.test(t, tam)$statistic,
+    t.test(t, pe)$statistic,
+    t.test(t, en)$statistic,
+    t.test(t, ne)$statistic,
+    t.test(t, tc)$statistic,
+    t.test(t, od)$statistic,
+    t.test(t, ac)$statistic
+  )
+
+  stats.tam <- c(
+    t.test(tam, t)$statistic,
+    t.test(tam, pe)$statistic,
+    t.test(tam, en)$statistic,
+    t.test(tam, ne)$statistic,
+    t.test(tam, tc)$statistic,
+    t.test(tam, od)$statistic,
+    t.test(tam, ac)$statistic
+  )
+
+  stats.pe <- c(
+    t.test(pe, t)$statistic,
+    t.test(pe, tam)$statistic,
+    t.test(pe, en)$statistic,
+    t.test(pe, ne)$statistic,
+    t.test(pe, tc)$statistic,
+    t.test(pe, od)$statistic,
+    t.test(pe, ac)$statistic
+  )
+
+  stats.en <- c(
+    t.test(en, t)$statistic,
+    t.test(en, tam)$statistic,
+    t.test(en, pe)$statistic,
+    t.test(en, ne)$statistic,
+    t.test(en, tc)$statistic,
+    t.test(en, od)$statistic,
+    t.test(en, ac)$statistic
+  )
+  
+    stats.tc <- c(
+    t.test(tc, t)$statistic,
+    t.test(tc, tam)$statistic,
+    t.test(tc, pe)$statistic,
+    t.test(tc, ne)$statistic,
+    t.test(tc, en)$statistic,
+    t.test(tc, od)$statistic,
+    t.test(tc, ac)$statistic
+  )
+    
+      
+    stats.ne <- c(
+    t.test(ne, t)$statistic,
+    t.test(ne, tam)$statistic,
+    t.test(ne, pe)$statistic,
+    t.test(ne, tc)$statistic,
+    t.test(ne, en)$statistic,
+    t.test(ne, od)$statistic,
+    t.test(ne, ac)$statistic
+  )
+    
+          
+    stats.od <- c(
+    t.test(od, t)$statistic,
+    t.test(od, tam)$statistic,
+    t.test(od, pe)$statistic,
+    t.test(od, tc)$statistic,
+    t.test(od, en)$statistic,
+    t.test(od, ne)$statistic,
+    t.test(od, ac)$statistic
+  )
+          
+    stats.ac <- c(
+    t.test(ac, t)$statistic,
+    t.test(ac, tam)$statistic,
+    t.test(ac, pe)$statistic,
+    t.test(ac, tc)$statistic,
+    t.test(ac, en)$statistic,
+    t.test(ac, ne)$statistic,
+    t.test(ac, od)$statistic
+  )
+
+
+  ee <- rbind(
+    ee,
+    data.frame(
+      pc = pc,
+      assoc.t = sqrt(sum(stats.t^2)) ,
+      assoc.tam = sqrt(sum(stats.tam^2)) ,
+      assoc.pe = sqrt(sum(stats.pe^2)) ,
+      assoc.en = sqrt(sum(stats.en^2)) ,
+      assoc.tc = sqrt(sum(stats.tc^2)) ,
+      assoc.ne = sqrt(sum(stats.ne^2)) ,
+      assoc.od = sqrt(sum(stats.od^2)) ,
+      assoc.ac = sqrt(sum(stats.ac^2)) 
+    )
+  )
+}
+
+ee
+
+plt <- ee |> 
+  tidyr::pivot_longer(-c('pc'))
+
+
+ggplot(plt, aes(x=pc, y=value,fill=name)) + 
+    geom_bar(stat = "identity", position = "fill")
+
+
+```
+
+
+## PC1 - TAM
+```{r}
+Seurat::Idents(obj__van_hijfte__sample_y) <- "celltype"
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PCinv_1", "PC_1"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_1))) |> 
+  dplyr::select("PC_1") |> 
+  head(n=25)
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CD163"))
+
+```
+
+
+## PC2 - OD
+
+```{r}
+Seurat::Idents(obj__van_hijfte__sample_y) <- "celltype"
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PCinv_2", "PC_2"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+Seurat::DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC1
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_2))) |> 
+  dplyr::select("PC_2") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_2)) |> 
+  dplyr::select("PC_2") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_2) |> 
+  dplyr::select("PC_2") |> 
+  head(n=30)
+
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TMEM144"))
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("DOCK5"))
+#Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ELMO1"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MBP"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("FRMD4B"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ST18"))
+
+#Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SHTN1"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PIP4K2A"))
+#Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ST6GALNAC3"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MAN2A1"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TMEM144"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MAP7"))
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("DOCK10"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("KIRREL3"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ENPP2"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCSK6"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ZNF536"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+```
+
+
+## PC3 - shared EN + PE
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PCinv_3", "PC_3"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_3))) |> 
+  dplyr::select(PC_3) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_3)) |> 
+  dplyr::select(PC_3) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_3) |> 
+  dplyr::select(PC_3) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ITGA1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("COBLL1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EBF1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ADGRF5"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("RBPMS"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SVIL"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SLC38A11"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CARMN"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("FLT1"))
+
+
+```
+
+
+## PC4 - Cell cycling vs. OD tumor
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c(
+    "PC_4", "PCinv_4",
+    "percentage_ribosomal_reads_scale",
+    "nFeature_RNA_scale"
+  ),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC3
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_4))) |> 
+  dplyr::select("PC_4") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_4)) |> 
+  dplyr::select("PC_4") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+## PC5 - neuron
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c(
+    "PC_5", "PCinv_5",
+    "percentage_ribosomal_reads_scale",
+    "nFeature_RNA_scale"
+  ),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC5
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_5))) |> 
+  dplyr::select("PC_5") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_5)) |> 
+  dplyr::select("PC_5") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
 
 ```
 
 
 
+## PC6 - Cell Cycling
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c(
+    "PC_6", "PCinv_6",
+    "percentage_ribosomal_reads_scale",
+    "nFeature_RNA_scale"
+  ),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(
+  "PC_1", "PCinv_2","PCinv_3"
+), group.by = 'celltype')
+
+
+
+# top features PC6
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_6))) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+## PC7 - PE vs. EN
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCinv_7", "PC_7"), label=T, 
+            cols = c("red", "lightgrey", "blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_7))) |> 
+  dplyr::select(PC_7) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_7)) |> 
+  dplyr::select(PC_7) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_7) |> 
+  dplyr::select(PC_7) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EGFL7"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ADGRL4"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ERG"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ABCB1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PTPRB"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CYYR1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("NOTCH4"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MECOM"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANO2"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("HSPG2"))
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SLC38A11"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CARMN"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EDNRA"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PLXDC1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("GRM8"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PDGFRB"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TRPC6"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EBF2"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PRR16"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PRKG1"))
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CD34"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("FLT4"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TIE1"))
+
+
+```
+
+
+## PC8 - tumor, AC vs NE?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c(
+    "PC_8", "PCinv_8",
+    "percentage_ribosomal_reads_scale",
+    "nFeature_RNA_scale"
+  ),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC8
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_8))) |> 
+  dplyr::select("PC_8") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+## PC9 - AC
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCinv_9", "PC_9"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC8
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_8))) |> 
+  dplyr::select("PC_8") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+
+## PC10 - TAM vs microglia
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCinv_10", "PC_10"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC8
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_8))) |> 
+  dplyr::select("PC_8") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+
+
+
+## PC11 - AC 2
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PCinv_11", "PC_11"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC8
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_8))) |> 
+  dplyr::select("PC_8") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+
+## PC12 - Tumor subtype EGFR
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCinv_12", "PC_12"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC12
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_12))) |> 
+  dplyr::select("PC_12") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MYO1B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("MOG"))
+
+```
+
+
+## PC13 - OD subtypes [KANK4 vs OPALIN]
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PCinv_13", "PC_13"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC13
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_13))) |> 
+  dplyr::select("PC_13") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("KANK4"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("OPALIN"))
+
+```
+
+## PC14 - unclear cell state? CD44
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PC_14", "PCinv_14"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"NA",obj__van_hijfte__sample_y$celltype)
+DotPlot(obj__van_hijfte__sample_y, features=c(paste0("PC_",1:10)), group.by = 'celltype')
+
+
+
+# top features PC14
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_14))) |> 
+  dplyr::select("PC_14") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_14)) |> 
+  dplyr::select("PC_14") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_14) |> 
+  dplyr::select("PC_14") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("DLL3"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("FGF12"))
+
+```
+
+
+## PC15 - PC13 & PC 14 combined?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PC_15", "PCinv_15"), label=T, 
+            cols = c("red", "lightgrey","blue")
+            #blend=T, cols=c("")
+            )
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_15))) |> 
+  dplyr::select("PC_15") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_15)) |> 
+  dplyr::select("PC_15") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_15) |> 
+  dplyr::select("PC_15") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("DLL3"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("FGF12"))
+
+```
+
+## PC16 - Glycolytic / Activated TAM?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_16", "PCinv_16", "HK2", "CD109"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_16))) |> 
+  dplyr::select("PC_16") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_16)) |> 
+  dplyr::select("PC_16") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_16) |> 
+  dplyr::select("PC_16") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("HK2"))
+
+
+```
+
+## PC17 - Macrophage Inflammatory?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_17", "PCinv_17"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_17))) |> 
+  dplyr::select("PC_17") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_17)) |> 
+  dplyr::select("PC_17") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_17) |> 
+  dplyr::select("PC_17") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CCL3"))
+
+
+```
+
+
+## PC18 - Macrophage activation state?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_18", "PCinv_18"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_18))) |> 
+  dplyr::select("PC_18") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_18)) |> 
+  dplyr::select("PC_18") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_18) |> 
+  dplyr::select("PC_18") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CCL3"))
+
+
+```
+
+
+## PC19 - Cluster 18, BMPER - DNA repair?
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_19", "PCinv_19", "BMPER"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_19))) |> 
+  dplyr::select("PC_19") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_19)) |> 
+  dplyr::select("PC_19") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_19) |> 
+  dplyr::select("PC_19") |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("BMPER"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("GPR17"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SEMA5B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TNS3"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("PPP1R16B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SLC1A1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TMEM132B"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TMEM163"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TMEM108"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("BCAS1"))
+
+
+```
+
+
+## PC20 - TAM substate marker
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_20", "PCinv_20"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_20))) |> 
+  dplyr::select("PC_20") |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_20)) |> 
+  dplyr::select(PC_20) |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_20) |> 
+  dplyr::select(PC_20) |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EYS"))
+
+
+```
+
+
+## PC21 - TAM sub state marker? [Heat shock]
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_21", "PCinv_21"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_21))) |> 
+  dplyr::select(PC_21) |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_21)) |> 
+  dplyr::select(PC_21) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_21) |> 
+  dplyr::select(PC_21) |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("EYS"))
+
+
+```
+
+
+## PC22 - T-cell
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_22", "PCinv_22"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_22))) |> 
+  dplyr::select(PC_22) |> 
+  head(n=25)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_22)) |> 
+  dplyr::select(PC_22) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_22) |> 
+  dplyr::select(PC_22) |> 
+  head(n=25)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SKAP1"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CD96"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("THEMIS"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SLFN12L"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("STAT4"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CD247"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("TC2N"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CD2"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ITK"))
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("CAMK4"))
+
+```
+
+
+
+## PC23 - Another HEAT like TAM substate
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_23", "PCinv_23"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_23))) |> 
+  dplyr::select(PC_23) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_23)) |> 
+  dplyr::select(PC_23) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_23) |> 
+  dplyr::select(PC_23) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("SKAP1"))
+
+
+```
+
+
+## PC24 - Unknown tumor state
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_24", "PCinv_24", "LINC01088"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_23))) |> 
+  dplyr::select(PC_23) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_24)) |> 
+  dplyr::select(PC_24) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_23) |> 
+  dplyr::select(PC_23) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("LINC01088"))
+
+
+```
+
+
+## PC25 - Unknown cell state
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_25", "PCinv_25", "COL8A1"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_25))) |> 
+  dplyr::select(PC_25) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_25)) |> 
+  dplyr::select(PC_25) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_25) |> 
+  dplyr::select(PC_25) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANXA1"))
+
+
+```
+
+
+
+## PC26 - TAM substate
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_26", "PCinv_26"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_26))) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_26)) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_26) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANXA1"))
+
+
+```
+
+
+
+## PC27 - TAM sub state
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_27", "PCinv_27"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_26))) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_26)) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_26) |> 
+  dplyr::select(PC_26) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANXA1"))
+
+
+```
+
+
+
+## PC28 - another heat shock
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_28", "PCinv_28"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_28))) |> 
+  dplyr::select(PC_28) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_28)) |> 
+  dplyr::select(PC_28) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_28) |> 
+  dplyr::select(PC_28) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANXA1"))
+
+
+```
+
+
+## PC29 - another heat shock
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_29", "PCinv_29", "percentage_mitochondrial_reads_scale"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_29))) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_29)) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_29) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+
+FeaturePlot(obj__van_hijfte__sample_y, reduction="umap", features=c("ANXA1"))
+
+
+```
+
+
+
+## PC30 - another heat shock
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_30", "PCinv_30"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_29))) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_29)) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_29) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+
+
+```
+
+
+
+
+## PC31 - TAM sub state
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_31", "PCinv_31"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_29))) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_29)) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_29) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+
+
+```
+
+
+
+
+## PC32 - TAM sub state
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_32", "PCinv_32"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_29))) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_29)) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_29) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+
+
+```
+
+
+
+
+## PC33 - OD substate?
+
+```{r}
+
+
+
+
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_33", "PCinv_33", "nCount_RNA_scale", "nFeature_RNA_scale"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_33))) |> 
+  dplyr::select(PC_33) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_33)) |> 
+  dplyr::select(PC_33) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_29) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+
+
+```
+
+
+
+
+## PC34 - unclear
+
+```{r}
+Idents(obj__van_hijfte__sample_y) <- "celltype"
+FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("PC_34", "PCinv_34",
+                "percentage_ribosomal_reads_scale",
+                "nFeature_RNA_scale"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Idents(obj__van_hijfte__sample_y) <- "seurat_clusters"
+
+
+
+
+
+# top features
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_34))) |> 
+  dplyr::select(PC_34) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_29)) |> 
+  dplyr::select(PC_29) |> 
+  head(n=30)
+
+obj__van_hijfte__sample_y@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_34) |> 
+  dplyr::select(PC_34) |> 
+  head(n=30)
+
+
+
+```
+
+# LDA re-classification usnig markers
+https://machinelearningmastery.com/linear-classification-in-r/
+
+```{r}
+obj__van_hijfte__sample_y <- readRDS("cache/backup.Rds")
+source('R/load__celltype_markers.R')
+
+```
+
+
+
+```{r}
+
+probs.lda <- data.frame()
+probs.plsda <- data.frame()
+
+markers <- celltype_markers |> dplyr::filter(celltype != "cell cycling") |>  dplyr::pull(markers)
+
+dat <- obj__van_hijfte__sample_y[markers,]@assays$RNA@data |> 
+  as.matrix() |> 
+  t() |> 
+  as.data.frame(stringsAsFactors=F) |> 
+  dplyr::mutate(celltype.annotated = obj__van_hijfte__sample_y$celltype)
+
+
+
+for(i in 1:10) {
+  train.sel <- 1:nrow(dat) %% 10 != (i - 1) 
+  test.sel <- train.sel == F
+  
+  
+  train <- dat[train.sel, ] |>
+    dplyr::filter(celltype.annotated != "NA") |>
+    tibble::remove_rownames()
+  labels <- train |>
+    dplyr::mutate(celltype.annotated = as.factor(celltype.annotated)) |>
+    dplyr::pull(celltype.annotated)
+  names(labels) <- NULL
+  test <- dat[test.sel,]
+  
+  
+  fit.lda <- MASS::lda(celltype.annotated ~ ., data=train)
+  p.lda = predict(fit.lda,test |>  dplyr::mutate(celltype.annotated = NULL))
+  probs.lda <- rbind(probs.lda, p.lda$posterior |> as.data.frame() |>  tibble::rownames_to_column('umi') )
+
+
+  # caret plsda is really buggy - issues with klaR
+  fit.plsda <- mdatools::plsda(
+    x = train |> dplyr::mutate(celltype.annotated = NULL),
+    c=  train |> dplyr::pull(celltype.annotated)
+  )
+  p.plsda <- predict(fit.plsda, test |> dplyr::mutate(celltype.annotated = NULL))
+  # plot(mdatools::plsdares(p.plsda, fit.plsda))
+  # plot(p.plsda)
+  # mdatools::plotPredictions(p.plsda,show.plot=F)
+  # mdatools::plotPredictions(p.plsda)
+  
+  
+  df = data.frame(umi = rownames(test),
+           score.astrocyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "astrocyte")],
+           score.endothelial = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "endothelial")],
+           score.neuron = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "neuron")],
+           score.oligodendrocyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "oligodendrocyte")],
+           score.OPC = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "OPC")],
+           score.pericyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "pericyte")],
+           score.tcell = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "T-cell")],
+           score.TAM = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "TAM")],
+           score.tumor = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "tumor")]
+           )
+
+  probs.plsda <- rbind(probs.plsda, df)
+  
+}
+
+
+probs.plsda <- data.frame(umi = colnames(obj__van_hijfte__sample_y)) |> 
+  dplyr::left_join(probs.plsda, by=c('umi'='umi'))
+stopifnot(probs.plsda$umi == colnames(obj__van_hijfte__sample_y))
+
+obj__van_hijfte__sample_y$`sc.astrocyte` <- probs.plsda$`score.astrocyte`
+obj__van_hijfte__sample_y$`sc.endothelial` <- probs.plsda$`score.endothelial`
+obj__van_hijfte__sample_y$`sc.neuron` <- probs.plsda$`score.neuron`
+obj__van_hijfte__sample_y$`sc.oligodendrocyte` <- probs.plsda$`score.oligodendrocyte`
+obj__van_hijfte__sample_y$`sc.pericyte` <- probs.plsda$`score.pericyte`
+obj__van_hijfte__sample_y$`sc.T.cell` <- probs.plsda$`score.tcell`
+obj__van_hijfte__sample_y$`sc.TAM` <- probs.plsda$`score.TAM`
+obj__van_hijfte__sample_y$`sc.tumor` <- probs.plsda$`score.tumor`
+
+
+
+
+probs.lda <- data.frame(umi = colnames(obj__van_hijfte__sample_y)) |> 
+   dplyr::left_join(probs.lda, by=c('umi'='umi'))
+stopifnot(probs.lda$umi == colnames(obj__van_hijfte__sample_y))
+
+obj__van_hijfte__sample_y$`astrocyte` <- probs.lda$`astrocyte`
+obj__van_hijfte__sample_y$`endothelial` <- probs.lda$`endothelial`
+obj__van_hijfte__sample_y$`neuron` <- probs.lda$`neuron`
+obj__van_hijfte__sample_y$`oligodendrocyte` <- probs.lda$`oligodendrocyte`
+obj__van_hijfte__sample_y$`pericyte` <- probs.lda$`pericyte`
+obj__van_hijfte__sample_y$`OPC` <- probs.lda$`OPC`
+obj__van_hijfte__sample_y$`T.cell` <- probs.lda$`T-cell`
+obj__van_hijfte__sample_y$`TAM` <- probs.lda$`TAM`
+obj__van_hijfte__sample_y$`tumor` <- probs.lda$`tumor`
+
+
+
+```
+## plot
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("tumor"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte","pericyte","endothelial","tumor","pericyte","T.cell","OPC","neuron","astrocyte"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("COL6A1","FN1","BGN","MPP2","MPP9","COL3A1","VIM"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`TAM` > 0.005)
+obj__van_hijfte__sample_y$dups <- sel
+plot(probs.lda$`oligodendrocyte`, probs.lda$`TAM`,pch=19,cex=0.4, col=as.numeric(sel + 1))
+
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte","dups"),
+  label = T,
+  cols = c( "lightgrey","red", "blue"),
+  order=T
+)
+
+
+sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`tumor` > 0.005)
+obj__van_hijfte__sample_y$dups <- sel
+plot(probs.lda$`oligodendrocyte`, probs.lda$`tumor`,pch=19,cex=0.4, col=as.numeric(sel + 1))
+
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("tumor","oligodendrocyte","dups"),
+  label = T,
+  cols = c( "lightgrey","red", "blue"),
+  order=T
+)
+
+```
+
+```{r}
+
+plot(obj__van_hijfte__sample_y$sc.TAM, obj__van_hijfte__sample_y$sc.oligodendrocyte)
+
+Seurat::FeaturePlot(obj__van_hijfte__sample_y,
+  reduction = "umap",
+  features = c("sc.TAM","sc.oligodendrocyte","sc.pericyte","sc.endothelial"),
+  label = T,
+  cols = c( "lightgrey","red", "blue")
+)
+
+```
 
 
 # Store object
