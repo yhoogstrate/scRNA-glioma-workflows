@@ -1,0 +1,966 @@
+---
+title: "scRNA-glioma-workflows: van Hijfte dataset - Sample Y"
+author: 
+  - Youri Hoogstrate
+  - Levi van Hijfte
+  - Santoesha A. Ghisai
+  - Maud Diepeveen
+date: "`r BiocStyle::doc_date()`"
+---
+
+# Load libraries and functions
+
+```{r}
+library(ggplot2)
+
+#source('R/function__remove_doublets.R')
+source('R/function__annotate_read_fractions.R')
+source('R/function__cache_seurat_object.R')
+
+
+source('R/load__celltype_markers.R')
+```
+
+
+# Import data & set config
+
+```{r}
+
+config <- list(
+  sample_name = 'SF11136',
+  sample_full_name = 'GSM4119535_SF11136_LGG',
+  path = "data/GSE138794_Diaz/scRNA_GSM4119535_SF11136_LGG/",
+  
+  random.seed = 42, # don't ask me but you can guess why, its Seurats default
+  
+  seurat.min.cells = 3,
+  seurat.min.features = 200,
+  
+  seurat.vst.nfeatures = 2000,
+  
+  min.nFeature_RNA = 750,
+  min.nCount_RNA = 1400,
+  
+  pca.informative.components = 21,
+  
+  cluster.resolution = 1.2
+)
+
+
+obj__diaz_2019__SF11136 <- Seurat::Read10X(
+  data.dir = config$path,
+  gene.column=1
+) |> Seurat::CreateSeuratObject(
+  min.cells = config$seurat.min.cells,
+  min.features = config$seurat.min.features,
+  project = config$sample_name
+)
+
+obj__diaz_2019__SF11136@misc <- config
+obj__diaz_2019__SF11136$celltype <- NA
+
+
+rm(config)
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
+```
+
+# Annotate fractions rRNA and MT-RNA
+
+```{r}
+obj__diaz_2019__SF11136 <- annotate_read_fractions(obj__diaz_2019__SF11136) # percentage MT, Ribo RNA and MALAT1
+
+
+
+obj__diaz_2019__SF11136$percentage_mitochondrial_reads_scale <- log((obj__diaz_2019__SF11136$percentage_mitochondrial_reads * 500) + 1)
+
+obj__diaz_2019__SF11136$percentage_MALAT1_reads_scale <- log((obj__diaz_2019__SF11136$percentage_mitochondrial_reads * 500) + 1)
+
+obj__diaz_2019__SF11136$percentage_ribosomal_reads_scale <- log((obj__diaz_2019__SF11136$percentage_ribosomal_reads * 100) + 1)
+
+
+obj__diaz_2019__SF11136[['nCount_RNA_scale']] <- log(obj__diaz_2019__SF11136$nCount_RNA / 100)
+
+obj__diaz_2019__SF11136[['nFeature_RNA_scale']] <- log(obj__diaz_2019__SF11136$nFeature_RNA / 100)
+
+
+
+```
+
+# Q/C
+## Exclude low-res cells
+
+```{r}
+Seurat::VlnPlot(object = obj__diaz_2019__SF11136, features = c("percentage_ribosomal_reads", "percentage_MALAT1_reads"), ncol = 3, pt.size = 0.01, group.by = "orig.ident")
+
+Seurat::VlnPlot(object = obj__diaz_2019__SF11136, features = c("nFeature_RNA", "nCount_RNA","percentage_mitochondrial_reads"), ncol = 2, pt.size = 0.01, group.by = "orig.ident")
+```
+
+
+```{r}
+ggplot(obj__diaz_2019__SF11136@meta.data, aes(y=`nFeature_RNA`, x=orig.ident)) +
+  geom_jitter(cex=0.01) +
+  geom_hline(yintercept = obj__diaz_2019__SF11136@misc$min.nFeature_RNA, col="red") +
+  geom_hline(yintercept = 4500,col="red")
+
+ggplot(obj__diaz_2019__SF11136@meta.data, aes(y=`nCount_RNA`, x=orig.ident)) +
+  geom_jitter(cex=0.01)  +
+  geom_hline(yintercept = obj__diaz_2019__SF11136@misc$min.nCount_RNA, col="red") +
+  geom_hline(yintercept = 14000,col="red")
+  #scale_y_log10()
+
+obj__diaz_2019__SF11136 <- subset(x = obj__diaz_2019__SF11136, subset = 
+                     nFeature_RNA >= obj__diaz_2019__SF11136@misc$min.nFeature_RNA &
+                     nCount_RNA >= obj__diaz_2019__SF11136@misc$min.nCount_RNA
+                     #nFeature_RNA < 4500 & 
+                     #nCount_RNA < 14000 &
+                     #percent.mito < 0.025
+)
+```
+
+
+# Normalize and cluster/UMAP
+## Scale / normalize
+
+```{r}
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::NormalizeData(
+  object = obj__diaz_2019__SF11136, 
+  normalization.method = "LogNormalize", 
+  scale.factor = 1e4,
+  verbose = F
+  )
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::FindVariableFeatures(
+  object = obj__diaz_2019__SF11136,
+  selection.method = "vst",
+  nfeatures = obj__diaz_2019__SF11136@misc$seurat.vst.nfeatures,
+  verbose = F
+)
+
+
+# Don't do this -- every update of the marker genes file will trigger new umap (+ annotation)
+# Append known marker genes to the variable features
+# append <- intersect(setdiff(celltype_markers$markers, obj__diaz_2019__SF11136@assays$RNA@var.features), rownames(obj__diaz_2019__SF11136))
+# if(length(append) > 0) {
+#   message(paste0("Appending ", length(append), " marker genes to variable features"))
+#   obj__diaz_2019__SF11136@assays$RNA@var.features <- c(obj__diaz_2019__SF11136@assays$RNA@var.features, append)
+# }
+# rm(append)
+
+
+obj__diaz_2019__SF11136 <- Seurat::ScaleData(
+  object = obj__diaz_2019__SF11136,
+  verbose = T
+  )
+```
+
+## PCA
+
+```{r}
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::RunPCA(
+  reduction.key = "PC_",
+  object = obj__diaz_2019__SF11136,
+  features = Seurat::VariableFeatures(object = obj__diaz_2019__SF11136),
+  verbose = F,
+  seed.use = obj__diaz_2019__SF11136@misc$random.seed
+)
+
+
+Seurat::ElbowPlot(
+  object = obj__diaz_2019__SF11136,
+  ndims = round(obj__diaz_2019__SF11136@misc$pca.informative.components * 4/3) + 1
+)
+
+
+# @todo add marker colors
+Seurat::VizDimLoadings(
+  object = obj__diaz_2019__SF11136,
+  dims = 1:6,
+  reduction = "pca"
+)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "pca")
+
+
+
+# add pca with reversely signed loadings and reversely signated values
+obj__diaz_2019__SF11136@reductions$invpca <- obj__diaz_2019__SF11136@reductions$pca
+obj__diaz_2019__SF11136@reductions$invpca@feature.loadings <- obj__diaz_2019__SF11136@reductions$invpca@feature.loadings * -1
+obj__diaz_2019__SF11136@reductions$invpca@cell.embeddings <- obj__diaz_2019__SF11136@reductions$invpca@cell.embeddings * -1
+Seurat::Key(obj__diaz_2019__SF11136@reductions$invpca) <- "PCinv_"
+
+```
+
+
+## Clustering
+
+```{r}
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::FindNeighbors(
+  object = obj__diaz_2019__SF11136,
+  dims = 1:obj__diaz_2019__SF11136@misc$pca.informative.components,
+  verbose = F
+)
+
+
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::FindClusters(
+  object = obj__diaz_2019__SF11136,
+  resolution = obj__diaz_2019__SF11136@misc$cluster.resolution,
+  algorithm = 1,
+  random.seed = obj__diaz_2019__SF11136@misc$random.seed,
+  verbose = F
+)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "pca", label = TRUE, pt.size = .6, group.by = "seurat_clusters")
+
+
+
+
+```
+
+
+## UMAP
+
+```{r}
+
+set.seed(obj__diaz_2019__SF11136@misc$random.seed)
+obj__diaz_2019__SF11136 <- Seurat::RunUMAP(
+  object = obj__diaz_2019__SF11136,
+  dims = 1:obj__diaz_2019__SF11136@misc$pca.informative.components,
+  seed.use = obj__diaz_2019__SF11136@misc$random.seed,
+  verbose = T
+)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap")
+
+
+```
+
+# Annotate cells manually
+
+## TAM
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "TAM") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+
+
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(10),"TAM",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
+```
+
+## oligodendrocyte
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "oligodendrocyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+
+
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(7,1,2,0,6,9,12),"oligodendrocyte",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## tumor
+
+```{r}
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c('CD44'),
+  label=T
+)
+
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "tumor") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+```
+
+
+```{r}
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% 
+                                            c(4, 8, 5,  3),
+                                          "tumor",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## OPC
+
+```{r, find}
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "OPC") |> 
+    dplyr::pull(markers) |> 
+    head(n = 8),
+  label=T
+)
+
+```
+
+
+```{r, set and confirm}
+
+opc.names <- c(
+  "AGGCTGCGTAACGCGA-1", "ATCACGAGTAGTCACT-1",
+  "CACTGTCCAAGTGGCA-1", "CCCTTAGAGTGCTAGG-1",
+  "CGTGAATAGAGCAACC-1", "CTTCAATCAGCGCGTT-1", 
+  "GACTCTCAGAGCCGAT-1", "TGATCTTAGAGCTTTC-1", 
+  "TTCCACGTCTCGTGAA-1", "TTGGATGGTGGTCAAG-1")
+obj__diaz_2019__SF11136$celltype = ifelse(colnames(obj__diaz_2019__SF11136) %in% opc.names,"OPC",obj__diaz_2019__SF11136$celltype)
+rm(opc.names)
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
+
+```
+
+## astrocyte
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "astrocyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+```
+
+
+```{r}
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(24),"astrocyte",obj__diaz_2019__SF11136$celltype)
+
+
+DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## neuron
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "neuron") |> 
+    dplyr::pull(markers) |> 
+    head(n = 6),
+  label=T
+)
+
+
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(23),"neuron",obj__diaz_2019__SF11136$celltype)
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+
+```
+
+
+
+## endothelial
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "endothelial") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T
+)
+```
+
+
+```{r}
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(11),"endothelial",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+```
+
+
+## pericyte
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "pericyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T
+)
+```
+
+
+```{r}
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(18),"pericyte",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+
+## T-cell
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "T-cell") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+```
+
+```{r}
+obj__diaz_2019__SF11136$celltype = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(26),"T-cell",obj__diaz_2019__SF11136$celltype)
+
+
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+
+```
+
+## Find remaining
+
+```{r, C3}
+m.3 <- Seurat::FindMarkers(obj__diaz_2019__SF11136, ident.1 = 3)
+head(m.3, n=25)
+```
+LINC01088  0.000000e+00  2.8359079 0.956 0.026  0.000000e+00
+ID4        0.000000e+00  3.0104386 0.973 0.040  0.000000e+00
+EDNRB      0.000000e+00  2.5992103 0.938 0.025  0.000000e+00
+SLC14A1    0.000000e+00  2.4181379 0.867 0.010  0.000000e+00
+GJA1      1.429890e-300  3.5274009 0.894 0.031 2.140688e-296
+SLC4A4    3.452693e-297  1.5680509 0.788 0.009 5.169027e-293
+MGST1     1.176369e-294  1.7258641 0.779 0.008 1.761143e-290
+LIX1      5.225919e-291  2.2180284 0.903 0.036 7.823723e-287
+KCNN3     6.270610e-287  2.5730555 0.956 0.055 9.387730e-283
+GPX3      3.004531e-282  3.1248437 0.929 0.050 4.498084e-278
+MLC1      1.116737e-281  1.1081215 0.739 0.006 1.671866e-277
+TMEM47    1.101784e-280  1.2469523 0.783 0.014 1.649481e-276
+PLTP      9.259567e-272  1.7297954 0.867 0.034 1.386250e-267
+AHNAK     1.655813e-267  1.5683290 0.872 0.034 2.478918e-263
+S100A10   4.050418e-266  1.8971748 0.841 0.028 6.063881e-262
+CD44      1.687907e-263  1.4189226 0.748 0.013 2.526965e-259
+FAT3      7.289679e-263  1.1665198 0.735 0.013 1.091338e-258
+SYTL4     7.397852e-259  1.6696984 0.916 0.058 1.107532e-254
+TIMP3     1.566364e-253  1.9716725 0.898 0.050 2.345003e-249
+CCDC80    2.290070e-248  1.0942316 0.681 0.009 3.428464e-244
+PRLHR     7.525860e-247  1.3467037 0.765 0.025 1.126696e-242
+CD99      1.292866e-246  3.0201008 0.996 0.109 1.935550e-242
+NMB       1.921961e-245  4.0598647 0.951 0.091 2.877368e-241
+BBOX1     3.804922e-244  0.8951846 0.637 0.004 5.696349e-240
+EFEMP1    2.213013e-242  1.1109420 0.695 0.013 3.313102e-238
+
+
+
+
+```{r, C11}
+m.11 <- Seurat::FindMarkers(obj__diaz_2019__SF11136, ident.1 = 11)
+head(m.11, n=25)
+```
+
+
+C1orf64  0.000000e+00  2.6756108 0.966 0.004  0.000000e+00
+CDA      0.000000e+00  2.0107801 0.897 0.001  0.000000e+00
+ADGRL4   0.000000e+00  1.8100046 0.828 0.001  0.000000e+00
+CD34     0.000000e+00  1.5085390 0.862 0.001  0.000000e+00
+ABCG2    0.000000e+00  3.0857655 1.000 0.005  0.000000e+00
+ECSCR.1  0.000000e+00  1.3821448 0.793 0.001  0.000000e+00
+DSP      0.000000e+00  0.8981521 0.759 0.000  0.000000e+00
+ADGRF5   0.000000e+00  2.3632485 0.897 0.001  0.000000e+00
+ABCB1    0.000000e+00  2.0047367 0.931 0.002  0.000000e+00
+GIMAP7   0.000000e+00  1.2135070 0.862 0.001  0.000000e+00
+GIMAP4   0.000000e+00  1.0532409 0.793 0.001  0.000000e+00
+FLI1     0.000000e+00  1.1648225 0.862 0.002  0.000000e+00
+ACVRL1   0.000000e+00  1.3625433 0.793 0.001  0.000000e+00
+ATP10A   0.000000e+00  2.0513104 0.862 0.001  0.000000e+00
+CGNL1    0.000000e+00  1.3298371 0.828 0.002  0.000000e+00
+TMEM204  0.000000e+00  2.4958926 0.966 0.003  0.000000e+00
+ICAM2    0.000000e+00  1.6439675 0.897 0.003  0.000000e+00
+PCAT19   0.000000e+00  2.1880319 0.966 0.001  0.000000e+00
+GGT5     0.000000e+00  2.4167906 1.000 0.005  0.000000e+00
+ERG      0.000000e+00  1.5592281 0.862 0.000  0.000000e+00
+PALMD   1.509625e-304  1.6576171 0.862 0.003 2.260059e-300
+TM4SF1  5.269190e-304  2.3132205 0.931 0.004 7.888504e-300
+SDPR    3.984029e-302  3.2381741 1.000 0.006 5.964490e-298
+MECOM   5.141079e-297  1.2156861 0.793 0.002 7.696709e-293
+TGM2    2.186670e-295  2.0348884 0.862 0.003 3.273664e-291
+
+
+
+## Visualize
+
+
+
+```{r}
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+```
+
+
+
+# Annotate componentents and/or clusters
+
+```{r}
+
+
+df <- -log10(geneset_component_associations(
+  obj__diaz_2019__SF11136, 
+  celltype_markers, 
+  obj__diaz_2019__SF11136@misc$pca.informative.components
+  ))
+
+plt <- df |>
+  tibble::rownames_to_column('PC')  |> 
+  dplyr::mutate(order = as.numeric(gsub("^PC", "", PC))) |> 
+  tidyr::pivot_longer(cols = -c('PC', 'order'), names_to = 'celltype') |> 
+  dplyr::mutate(alpha = value > -log10(0.01))
+
+
+ggplot(plt, aes(x=reorder(PC, order), y=value, fill=celltype, alpha=alpha)) +
+  geom_bar(stat = "identity", position = "stack")
+
+```
+
+
+```{r}
+ee <- data.frame()
+for (pc in 1:34) {
+  obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc]
+
+  t <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "tumor"]
+  
+  tam <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "TAM"]
+  
+  pe <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "pericyte"]
+  
+  en <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "endothelial"]
+
+    ne <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "neuron"]
+    
+  tc <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "T-cell"]
+  od <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "oligodendrocyte"]
+  ac <- obj__diaz_2019__SF11136@reductions$pca@cell.embeddings[, pc:pc][obj__diaz_2019__SF11136$celltype == "astrocyte"]
+
+  stats.t <- c(
+    t.test(t, tam)$statistic,
+    t.test(t, pe)$statistic,
+    t.test(t, en)$statistic,
+    t.test(t, ne)$statistic,
+    t.test(t, tc)$statistic,
+    t.test(t, od)$statistic,
+    t.test(t, ac)$statistic
+  )
+
+  stats.tam <- c(
+    t.test(tam, t)$statistic,
+    t.test(tam, pe)$statistic,
+    t.test(tam, en)$statistic,
+    t.test(tam, ne)$statistic,
+    t.test(tam, tc)$statistic,
+    t.test(tam, od)$statistic,
+    t.test(tam, ac)$statistic
+  )
+
+  stats.pe <- c(
+    t.test(pe, t)$statistic,
+    t.test(pe, tam)$statistic,
+    t.test(pe, en)$statistic,
+    t.test(pe, ne)$statistic,
+    t.test(pe, tc)$statistic,
+    t.test(pe, od)$statistic,
+    t.test(pe, ac)$statistic
+  )
+
+  stats.en <- c(
+    t.test(en, t)$statistic,
+    t.test(en, tam)$statistic,
+    t.test(en, pe)$statistic,
+    t.test(en, ne)$statistic,
+    t.test(en, tc)$statistic,
+    t.test(en, od)$statistic,
+    t.test(en, ac)$statistic
+  )
+  
+    stats.tc <- c(
+    t.test(tc, t)$statistic,
+    t.test(tc, tam)$statistic,
+    t.test(tc, pe)$statistic,
+    t.test(tc, ne)$statistic,
+    t.test(tc, en)$statistic,
+    t.test(tc, od)$statistic,
+    t.test(tc, ac)$statistic
+  )
+    
+      
+    stats.ne <- c(
+    t.test(ne, t)$statistic,
+    t.test(ne, tam)$statistic,
+    t.test(ne, pe)$statistic,
+    t.test(ne, tc)$statistic,
+    t.test(ne, en)$statistic,
+    t.test(ne, od)$statistic,
+    t.test(ne, ac)$statistic
+  )
+    
+          
+    stats.od <- c(
+    t.test(od, t)$statistic,
+    t.test(od, tam)$statistic,
+    t.test(od, pe)$statistic,
+    t.test(od, tc)$statistic,
+    t.test(od, en)$statistic,
+    t.test(od, ne)$statistic,
+    t.test(od, ac)$statistic
+  )
+          
+    stats.ac <- c(
+    t.test(ac, t)$statistic,
+    t.test(ac, tam)$statistic,
+    t.test(ac, pe)$statistic,
+    t.test(ac, tc)$statistic,
+    t.test(ac, en)$statistic,
+    t.test(ac, ne)$statistic,
+    t.test(ac, od)$statistic
+  )
+
+
+  ee <- rbind(
+    ee,
+    data.frame(
+      pc = pc,
+      assoc.t = sqrt(sum(stats.t^2)) ,
+      assoc.tam = sqrt(sum(stats.tam^2)) ,
+      assoc.pe = sqrt(sum(stats.pe^2)) ,
+      assoc.en = sqrt(sum(stats.en^2)) ,
+      assoc.tc = sqrt(sum(stats.tc^2)) ,
+      assoc.ne = sqrt(sum(stats.ne^2)) ,
+      assoc.od = sqrt(sum(stats.od^2)) ,
+      assoc.ac = sqrt(sum(stats.ac^2)) 
+    )
+  )
+}
+
+ee
+
+plt <- ee |> 
+  tidyr::pivot_longer(-c('pc'))
+
+
+ggplot(plt, aes(x=pc, y=value,fill=name)) + 
+    geom_bar(stat = "identity", position = "fill")
+
+
+```
+
+
+## PC1
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_1", "PC_1"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+
+```{r}
+# top features
+obj__diaz_2019__SF11136@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_1))) |> 
+  dplyr::select("PC_1") |> 
+  head(n=25)
+
+FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c(""))
+
+```
+
+
+
+# LDA re-classification usnig markers
+https://machinelearningmastery.com/linear-classification-in-r/
+
+
+
+
+```{r}
+
+probs.lda <- data.frame()
+probs.plsda <- data.frame()
+
+markers <- celltype_markers |> dplyr::filter(celltype != "cell cycling") |> dplyr::pull(markers)
+
+dat <- obj__diaz_2019__SF11136[markers,]@assays$RNA@data |> 
+  as.matrix() |> 
+  t() |> 
+  as.data.frame(stringsAsFactors=F) |> 
+  dplyr::mutate(celltype.annotated = obj__diaz_2019__SF11136$celltype)
+
+
+
+for(i in 1:10) {
+  train.sel <- 1:nrow(dat) %% 10 != (i - 1) 
+  test.sel <- train.sel == F
+  
+  
+  train <- dat[train.sel, ] |>
+    dplyr::filter(celltype.annotated != "NA") |>
+    tibble::remove_rownames()
+  labels <- train |>
+    dplyr::mutate(celltype.annotated = as.factor(celltype.annotated)) |>
+    dplyr::pull(celltype.annotated)
+  names(labels) <- NULL
+  test <- dat[test.sel,]
+  
+  
+  fit.lda <- MASS::lda(celltype.annotated ~ ., data=train)
+  p.lda = predict(fit.lda,test |>  dplyr::mutate(celltype.annotated = NULL))
+  probs.lda <- rbind(probs.lda, p.lda$posterior |> as.data.frame() |>  tibble::rownames_to_column('umi') )
+
+
+  # # caret plsda is really buggy - issues with klaR
+  # fit.plsda <- mdatools::plsda(
+  #   x = train |> dplyr::mutate(celltype.annotated = NULL),
+  #   c=  train |> dplyr::pull(celltype.annotated)
+  # )
+  # p.plsda <- predict(fit.plsda, test |> dplyr::mutate(celltype.annotated = NULL))
+  # # plot(mdatools::plsdares(p.plsda, fit.plsda))
+  # # plot(p.plsda)
+  # # mdatools::plotPredictions(p.plsda,show.plot=F)
+  # # mdatools::plotPredictions(p.plsda)
+  # 
+  # 
+  # df = data.frame(umi = rownames(test),
+  #          score.astrocyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "astrocyte")],
+  #          score.endothelial = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "endothelial")],
+  #          score.neuron = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "neuron")],
+  #          score.oligodendrocyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "oligodendrocyte")],
+  #          score.OPC = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "OPC")],
+  #          score.pericyte = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "pericyte")],
+  #          score.tcell = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "T-cell")],
+  #          score.TAM = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "TAM")],
+  #          score.tumor = p.plsda$p.pred[, p.plsda$ncomp.selected, which(p.plsda$classnames == "tumor")]
+  #          )
+  # 
+  # probs.plsda <- rbind(probs.plsda, df)
+  
+}
+
+
+# probs.plsda <- data.frame(umi = colnames(obj__diaz_2019__SF11136)) |> 
+#   dplyr::left_join(probs.plsda, by=c('umi'='umi'))
+# stopifnot(probs.plsda$umi == colnames(obj__diaz_2019__SF11136))
+# 
+# #obj__diaz_2019__SF11136$`sc.astrocyte` <- probs.plsda$`score.astrocyte`
+# obj__diaz_2019__SF11136$`sc.endothelial` <- probs.plsda$`score.endothelial`
+# #obj__diaz_2019__SF11136$`sc.neuron` <- probs.plsda$`score.neuron`
+# obj__diaz_2019__SF11136$`sc.oligodendrocyte` <- probs.plsda$`score.oligodendrocyte`
+# #obj__diaz_2019__SF11136$`sc.pericyte` <- probs.plsda$`score.pericyte`
+# #obj__diaz_2019__SF11136$`sc.T.cell` <- probs.plsda$`score.tcell`
+# obj__diaz_2019__SF11136$`sc.TAM` <- probs.plsda$`score.TAM`
+# obj__diaz_2019__SF11136$`sc.tumor` <- probs.plsda$`score.tumor`
+
+
+nrow(probs.lda) == ncol(obj__diaz_2019__SF11136)
+
+probs.lda <- data.frame(umi = colnames(obj__diaz_2019__SF11136)) |> 
+   dplyr::left_join(probs.lda, by=c('umi'='umi'))
+stopifnot(probs.lda$umi == colnames(obj__diaz_2019__SF11136))
+
+#obj__diaz_2019__SF11136$`astrocyte` <- probs.lda$`astrocyte`
+obj__diaz_2019__SF11136$`endothelial` <- probs.lda$`endothelial`
+#obj__diaz_2019__SF11136$`neuron` <- probs.lda$`neuron`
+obj__diaz_2019__SF11136$`oligodendrocyte` <- probs.lda$`oligodendrocyte`
+#obj__diaz_2019__SF11136$`pericyte` <- probs.lda$`pericyte`
+#obj__diaz_2019__SF11136$`OPC` <- probs.lda$`OPC`
+#obj__diaz_2019__SF11136$`T.cell` <- probs.lda$`T-cell`
+obj__diaz_2019__SF11136$`TAM` <- probs.lda$`TAM`
+obj__diaz_2019__SF11136$`tumor` <- probs.lda$`tumor`
+
+```
+
+
+
+## plot
+
+```{r}
+plt <- data.frame(slot = names(obj__diaz_2019__SF11136@meta.data)) |> 
+  dplyr::filter(slot %in% c('celltype',unique(obj__diaz_2019__SF11136$celltype)))
+
+plt <- obj__diaz_2019__SF11136@meta.data |>
+  dplyr::select(plt$slot) |> 
+  tidyr::pivot_longer(cols=-'celltype') |> 
+  dplyr::group_by(name) |> 
+  dplyr::mutate(x = order(order(value))) |> 
+  dplyr::ungroup()
+
+
+ggplot(plt, aes(x = x, y=value, col=celltype)) +
+  geom_point(pch=19,cex=0.2) +
+  facet_grid(rows = vars(name), scales="free",space="free") +
+  labs(x=NULL)
+
+
+```
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+```
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("tumor"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte","pericyte","endothelial","tumor","pericyte","T.cell","OPC","neuron","astrocyte"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("COL6A1","FN1","BGN","MPP2","MPP9","COL3A1","VIM"),
+  label = F,
+  cols = c( "lightgrey","red", "blue")
+)
+
+sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`TAM` > 0.005)
+obj__diaz_2019__SF11136$dups <- sel
+plot(probs.lda$`oligodendrocyte`, probs.lda$`TAM`,pch=19,cex=0.4, col=as.numeric(sel + 1))
+
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("TAM","oligodendrocyte","dups"),
+  label = T,
+  cols = c( "lightgrey","red", "blue"),
+  order=T
+)
+
+
+sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`tumor` > 0.005)
+obj__diaz_2019__SF11136$dups <- sel
+plot(probs.lda$`oligodendrocyte`, probs.lda$`tumor`,pch=19,cex=0.4, col=as.numeric(sel + 1))
+
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("tumor","oligodendrocyte","dups"),
+  label = T,
+  cols = c( "lightgrey","red", "blue"),
+  order=T
+)
+
+```
+
+```{r}
+
+plot(obj__diaz_2019__SF11136$sc.TAM, obj__diaz_2019__SF11136$sc.oligodendrocyte)
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("sc.TAM","sc.oligodendrocyte","sc.pericyte","sc.endothelial"),
+  label = T,
+  cols = c( "lightgrey","red", "blue")
+)
+
+```
+
+
+# Store object
+
+## Check git code changes and save
+
+```{r}
+cache_seurat_object(obj__diaz_2019__SF11136)
+```
+
+
+
+
+# Visualizations
+
+```{r}
+FeaturePlot(obj__diaz_2019__SF11136, features=c("TMEM144"))
+
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "MOG")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "PLP1")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TMEM144")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TMEM125")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "ABCB1")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "CD34")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "FLT4")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "TIE1") # meh
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "ITGA1") # endo + peri?
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "RGS5")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "PDGFRB")
+scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "CD248")
+
+
+```
+
+
