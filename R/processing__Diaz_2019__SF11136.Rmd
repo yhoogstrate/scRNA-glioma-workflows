@@ -716,23 +716,11 @@ obj__diaz_2019__SF11136 <- celltype_reclassification_lda(
 
 
 
+
 ```{r}
-plt <- data.frame(slot = names(obj__diaz_2019__SF11136@meta.data)) |> 
-  dplyr::filter(slot  == 'celltype.annotated' | grepl("^reclass\\.LDA\\.",slot))
-
-plt <- obj__diaz_2019__SF11136@meta.data |>
-  dplyr::select(plt$slot) |> 
-  tidyr::pivot_longer(cols=-'celltype.annotated') |> 
-  dplyr::group_by(name) |> 
-  dplyr::mutate(x = order(order(value))) |> 
-  dplyr::ungroup()
-
-
-ggplot(plt, aes(x = x, y=value, col=celltype.annotated)) +
-  geom_point(pch=19,cex=0.2) +
-  facet_grid(rows = vars(name), scales="free",space="free") +
-  labs(x=NULL)
+plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass.LDA.")
 ```
+
 
 
 ## LDA + PCA
@@ -748,10 +736,20 @@ obj__diaz_2019__SF11136 <- celltype_reclassification_lda_with_pca(
 
 ```
 
+
 ```{r}
 plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass.LDA_PCA.")
 ```
 
+
+```{r}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = colnames(obj__diaz_2019__SF11136@meta.data)[grepl("^reclass.LDA_PCA.",colnames(obj__diaz_2019__SF11136@meta.data))],
+  label = F,
+  cols = c("lightgrey","red", "blue")
+)
+```
 
 
 ## PSLDA
@@ -770,109 +768,22 @@ plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^re
 ```
 
 
-
-
-### SVM 
-
-
-### SVM + PCA
-
-
-
-
-```{r}
-plt <- data.frame(slot = names(obj__diaz_2019__SF11136@meta.data)) |> 
-  dplyr::filter(slot %in% c('celltype',unique(obj__diaz_2019__SF11136$celltype)))
-
-plt <- obj__diaz_2019__SF11136@meta.data |>
-  dplyr::select(plt$slot) |> 
-  tidyr::pivot_longer(cols=-'celltype') |> 
-  dplyr::group_by(name) |> 
-  dplyr::mutate(x = order(order(value))) |> 
-  dplyr::ungroup()
-
-
-ggplot(plt, aes(x = x, y=value, col=celltype)) +
-  geom_point(pch=19,cex=0.2) +
-  facet_grid(rows = vars(name), scales="free",space="free") +
-  labs(x=NULL)
-
-```
-
 ```{r}
 Seurat::FeaturePlot(obj__diaz_2019__SF11136,
   reduction = "umap",
-  features = c("TAM","oligodendrocyte"),
+  features = colnames(obj__diaz_2019__SF11136@meta.data)[grepl("^reclass\\.PSLDA\\.",colnames(obj__diaz_2019__SF11136@meta.data))],
   label = F,
-  cols = c( "lightgrey","red", "blue")
+  cols = c("lightgrey","red", "blue")
 )
 ```
 
-```{r}
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("tumor"),
-  label = F,
-  cols = c( "lightgrey","red", "blue")
-)
+
+## SVM 
 
 
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("TAM","oligodendrocyte","pericyte","endothelial","tumor","pericyte","T.cell","OPC","neuron","astrocyte"),
-  label = F,
-  cols = c( "lightgrey","red", "blue")
-)
+## SVM + PCA
 
 
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("COL6A1","FN1","BGN","MPP2","MPP9","COL3A1","VIM"),
-  label = F,
-  cols = c( "lightgrey","red", "blue")
-)
-
-sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`TAM` > 0.005)
-obj__diaz_2019__SF11136$dups <- sel
-plot(probs.lda$`oligodendrocyte`, probs.lda$`TAM`,pch=19,cex=0.4, col=as.numeric(sel + 1))
-
-
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("TAM","oligodendrocyte","dups"),
-  label = T,
-  cols = c( "lightgrey","red", "blue"),
-  order=T
-)
-
-
-sel <- (probs.lda$`oligodendrocyte` > 0.005 & probs.lda$`tumor` > 0.005)
-obj__diaz_2019__SF11136$dups <- sel
-plot(probs.lda$`oligodendrocyte`, probs.lda$`tumor`,pch=19,cex=0.4, col=as.numeric(sel + 1))
-
-
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("tumor","oligodendrocyte","dups"),
-  label = T,
-  cols = c( "lightgrey","red", "blue"),
-  order=T
-)
-
-```
-
-```{r}
-
-plot(obj__diaz_2019__SF11136$sc.TAM, obj__diaz_2019__SF11136$sc.oligodendrocyte)
-
-Seurat::FeaturePlot(obj__diaz_2019__SF11136,
-  reduction = "umap",
-  features = c("sc.TAM","sc.oligodendrocyte","sc.pericyte","sc.endothelial"),
-  label = T,
-  cols = c( "lightgrey","red", "blue")
-)
-
-```
 
 
 # Store object

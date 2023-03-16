@@ -35,10 +35,10 @@ celltype_reclassification_pslda <- function(seurat_object, marker_features, n.co
       train,
       factor(train.labels),
       ncomp=n.components
-      ,probMethod = "Bayes"
+      #,probMethod = "Bayes"
     )
     
-    p.plsda.caret = predict(fit.plsda.caret, test, type = "prob") |> 
+    p.plsda.caret = caret:::predict.plsda(fit.plsda.caret, test, type = "prob") |> 
       as.data.frame() |>
       dplyr::rename_with( ~ gsub("\\.[0-9]+ comps$", "", .x, fixed = FALSE)) |> 
       tibble::rownames_to_column('umi') |> 
@@ -58,7 +58,7 @@ celltype_reclassification_pslda <- function(seurat_object, marker_features, n.co
   out <- data.frame(umi = rownames(data)) |> 
     dplyr::left_join(out, by=c('umi'='umi')) |> 
     tibble::column_to_rownames('umi') |> 
-    dplyr::rename_with( ~ paste0(prefix, .x))
+    dplyr::rename_with(~ paste0(prefix, .x))
   
   
   
