@@ -385,9 +385,9 @@ Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.
 
 ```
 
+## endothelial & pericyte
 
-
-## endothelial
+### endothelial
 
 ```{r}
 Seurat::FeaturePlot(obj__van_hijfte__sample_y,
@@ -408,7 +408,7 @@ Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.
 ```
 
 
-## pericyte
+### pericyte
 
 ```{r}
 Seurat::FeaturePlot(obj__van_hijfte__sample_y,
