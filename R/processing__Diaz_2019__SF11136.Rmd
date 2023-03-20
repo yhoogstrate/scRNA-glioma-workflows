@@ -60,6 +60,17 @@ obj__diaz_2019__SF11136@misc <- config
 obj__diaz_2019__SF11136$celltype.annotated <- NA
 
 
+
+obj__diaz_2019__SF11136@misc$reclass.PSLDA.min.scores <- list(
+  'oligodendrocyte' = 0.365,
+  'tumor' = 0.33,
+  'neuron' = 0,
+  'endothelial' = 0,
+  'pericyte' = 0.22,
+  'T-cell' = 0
+)
+
+
 rm(config)
 
 set.seed(obj__diaz_2019__SF11136@misc$random.seed)
@@ -384,7 +395,8 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
 
 
 ## endothelial & pericytes
-### endothelial
+PC_6 negative = EN
+PC_6 positive = PE
 
 ```{r}
 Seurat::FeaturePlot(obj__diaz_2019__SF11136,
@@ -399,14 +411,46 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
 
 
 ```{r}
-obj__diaz_2019__SF11136$celltype.annotated = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(11),"endothelial",obj__diaz_2019__SF11136$celltype.annotated)
+en_pe = obj__diaz_2019__SF11136[,obj__diaz_2019__SF11136$seurat_clusters %in% c(11)]
+
+plot(density(as.data.frame(en_pe@reductions$pca@cell.embeddings)[["PC_6"]]))
+abline(v=12)
+
+# PE
+as.data.frame(en_pe@reductions$pca@cell.embeddings) |>
+  dplyr::filter(PC_6 > 12) |> 
+  tibble::rownames_to_column('umi') |> 
+  dplyr::pull(umi)
+
+pe.umis <- c("AAGGCAGAGTCCATAC_1", "ATAGACCCAGCCACCA_1", "CGAGCACTCGCATGAT_1", "CGGGTCAAGGTGCTTT_1", "GACGCGTCACCCAGTG_1",
+  "TCAATCTCACGCCAGT_1", "TATCTCAAGATCCCAT_2")
+
+
+
+# EN
+as.data.frame(en_pe@reductions$pca@cell.embeddings) |>
+  dplyr::filter(PC_6 <= 12) |> 
+  tibble::rownames_to_column('umi') |> 
+  dplyr::pull(umi)
+
+en.umis <- c("ACGAGGATCAGAAATG_1", "AGTGTCAAGAGACGAA_1", "ATAGACCCATCGATTG_1", "CCACCTAGTTCCTCCA_1", "CGTTAGAGTTGAGGTG_1", 
+"GCGCCAACATCGGGTC_1", "GCTGCGAGTCGCATCG_1", "GGGATGATCGCCTGAG_1", "GTGAAGGAGTCGATAA_1", "TAAGAGATCCGTAGGC_1",
+"TAGCCGGAGATCCTGT_1", "ACCCACTAGCAATCTC_2", "AGGGTGACACCAGATT_2", "CAGGTGCAGAATAGGG_2", "CCATTCGTCTCACATT_2",
+"CGGACTGCATTGAGCT_2", "CGGCTAGAGAGGGATA_2", "GCAATCAGTGTAACGG_2", "GCGCCAACATCGGGTC_2", "GCTTGAACATGACGGA_2",
+"GGCGACTGTCTCGTTC_2", "TCTTTCCGTAGGAGTC_2")
+
+obj__diaz_2019__SF11136$celltype.annotated = ifelse(colnames(obj__diaz_2019__SF11136) %in% en.umis,"endothelial", obj__diaz_2019__SF11136$celltype.annotated)
+rm(en.umis)
+
+obj__diaz_2019__SF11136$celltype.annotated = ifelse(colnames(obj__diaz_2019__SF11136) %in% pe.umis,"pericyte", obj__diaz_2019__SF11136$celltype.annotated)
+rm(pe.umis)
+
+rm(en_pe)
 
 
 Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
 ```
 
-
-### pericyte
 
 ```{r}
 Seurat::FeaturePlot(obj__diaz_2019__SF11136,
@@ -671,7 +715,7 @@ ggplot(plt, aes(x=pc, y=value,fill=name)) +
 
 ## PC1
 ```{r}
-Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype"
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
 Seurat::FeaturePlot(obj__diaz_2019__SF11136,
   reduction = "umap",
   features = c("PCinv_1", "PC_1"),
@@ -693,6 +737,117 @@ obj__diaz_2019__SF11136@reductions$pca@feature.loadings |>
 FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c(""))
 
 ```
+
+## PC2 - EN and/or PE
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_2", "PC_2"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+
+## PC3 - tumor astrocyte like subcluster?
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_3", "PC_3"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+```{r}
+# top features
+obj__diaz_2019__SF11136@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_3))) |> 
+  dplyr::select("PC_3") |> 
+  head(n=25)
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("ID4"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("GABRG1"))
+```
+
+## PC4 - TAM
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_4", "PC_4"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+
+## PC5 - subcluster OD
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_5", "PC_5"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+
+```{r}
+# top features
+obj__diaz_2019__SF11136@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(abs(PC_5))) |> 
+  dplyr::select("PC_5") |> 
+  head(n=25)
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("TMEM108"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("TMEM163"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("PRICKLE1"))
+```
+
+
+
+## PC6 - EN vs PE ?
+```{r}
+Seurat::Idents(obj__diaz_2019__SF11136) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = c("PCinv_6", "PC_6"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__diaz_2019__SF11136) <- "seurat_clusters"
+```
+
+
+```{r, top features}
+obj__diaz_2019__SF11136@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(desc(PC_6)) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+obj__diaz_2019__SF11136@reductions$pca@feature.loadings |> 
+  as.data.frame() |> 
+  dplyr::arrange(PC_6) |> 
+  dplyr::select("PC_6") |> 
+  head(n=25)
+
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("C1S"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("DCN"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("BTNL9"))
+Seurat::FeaturePlot(obj__diaz_2019__SF11136, reduction="umap", features=c("CDA"))
+```
+
 
 
 
@@ -761,10 +916,13 @@ obj__diaz_2019__SF11136 <- celltype_reclassification_pslda(
   20,
   "celltype.annotated"
 )
+
+obj__diaz_2019__SF11136 = flag_uncertain_classifications(obj__diaz_2019__SF11136, "PSLDA")
 ```
 
 ```{r}
 plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass\\.PSLDA\\.")
+plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'reclass.PSLDA.class' ,"^reclass\\.PSLDA\\.", "noskip$")
 ```
 
 
@@ -777,11 +935,42 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
 )
 ```
 
+### min classifier scores
+
+#### PE
+
+```{r}
+plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass\\.PSLDA\\.") + 
+  geom_hline(yintercept = obj__diaz_2019__SF11136@misc$reclass.PSLDA.min.scores$`pericyte`, lwd=0.5, col="darkgray")
+```
+
+
+#### OD
+
+
+```{r}
+plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass\\.PSLDA\\.") + 
+  geom_hline(yintercept = obj__diaz_2019__SF11136@misc$reclass.PSLDA.min.scores$`oligodendrocyte`, lwd=0.5, col="darkgray")
+```
+
+
+
+#### T ~= 0.33
+
+
+
+```{r}
+plot_sorted_classifier_scores(obj__diaz_2019__SF11136,'celltype.annotated' ,"^reclass\\.PSLDA\\.") + 
+  geom_hline(yintercept = obj__diaz_2019__SF11136@misc$reclass.PSLDA.min.scores$`tumor`, lwd=0.5, col="darkgray")
+```
+
+
 
 ## SVM 
 
 
 ## SVM + PCA
+
 
 
 

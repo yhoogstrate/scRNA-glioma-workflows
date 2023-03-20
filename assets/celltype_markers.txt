@@ -33,6 +33,8 @@ endothelial,NOTCH4
 endothelial,MECOM
 endothelial,ANO2
 endothelial,HSPG2
+endothelial,BTNL9
+endothelial,CDA
 pericyte,CD248
 pericyte,RGS5
 pericyte,SLC38A11
@@ -45,6 +47,8 @@ pericyte,TRPC6
 pericyte,EBF2
 pericyte,PRR16
 pericyte,PRKG1
+pericyte,C1S
+pericyte,DCN
 endothelial_and_pericyte,MYO1B
 endothelial_and_pericyte,ITGA1
 endothelial_and_pericyte,COBLL1

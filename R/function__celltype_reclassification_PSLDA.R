@@ -16,7 +16,7 @@ celltype_reclassification_pslda <- function(seurat_object, marker_features, n.co
   stopifnot(labels$umi == features$umi)
 
   for(i in 1:10) {
-    train.sel <- 1:nrow(data) %% 10 != (i - 1) 
+    train.sel <- 1:nrow(features) %% 10 != (i - 1) 
     test.sel <- train.sel == F
     stopifnot(sum(train.sel) + sum(test.sel) == nrow(labels))
     
@@ -41,25 +41,26 @@ celltype_reclassification_pslda <- function(seurat_object, marker_features, n.co
     p.plsda.caret = caret:::predict.plsda(fit.plsda.caret, test, type = "prob") |> 
       as.data.frame() |>
       dplyr::rename_with( ~ gsub("\\.[0-9]+ comps$", "", .x, fixed = FALSE)) |> 
+      dplyr::rename_with( ~ gsub("\\.[0-9]+ ncomps$", "", .x, fixed = FALSE)) |> 
       tibble::rownames_to_column('umi') |> 
       (function(.) {
         assertthat::assert_that(nrow(.) == nrow(test))
         return(.)
       })()
-  
+    
+    p.plsda.caret$class <-  as.character(caret:::predict.plsda(fit.plsda.caret, test))
+
     out <- rbind(out, p.plsda.caret)
   }
   
   
-  stopifnot(nrow(data) == nrow(out))
-  
+  stopifnot(nrow(features) == nrow(out))
   
   # reorder to original order and add prefix to colnames
-  out <- data.frame(umi = rownames(data)) |> 
+  out <- data.frame(umi = rownames(features)) |> 
     dplyr::left_join(out, by=c('umi'='umi')) |> 
     tibble::column_to_rownames('umi') |> 
     dplyr::rename_with(~ paste0(prefix, .x))
-  
   
   
   for(c in colnames(out)) {

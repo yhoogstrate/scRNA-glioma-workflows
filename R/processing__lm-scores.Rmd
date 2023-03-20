@@ -1,0 +1,107 @@
+
+# load samples
+
+```{r}
+classifier <- 'PSLDA'
+files <- c('cache/SF11136__master.Rds', 'processing__van_Hijfte__Sample-Y.Rmd')
+
+norm.counts <- data.frame()
+metadata.per.cell <- data.frame()
+
+for(file in files) {
+  file <- files[1]
+
+  obj <- readRDS(file)
+  
+  norm.counts <- obj@assays$RNA@data
+  raw.counts <- obj@assays$RNA@counts
+  class <- obj@meta.data$reclass.PSLDA.class
+}
+
+
+```
+
+## lm ~ predictor
+
+```{r}
+
+lmpred <- function(norm_counts, raw_counts, contrast) {
+  dat <- contrast |> 
+    dplyr::mutate(expr = norm_counts)
+  
+  dat$expr <- dat$expr / sd(c(norm_counts[raw_counts > 0], -norm_counts[raw_counts > 0] )) # to make it symetric
+  
+  res <- lm(expr ~ 0 + ., data=dat)
+  
+  return(res$coefficients)
+}
+
+
+labels <- obj__diaz_2019__SF11136[["reclass.PSLDA.class"]] |> 
+  dplyr::filter(!is.na(reclass.PSLDA.class)) |> 
+  tibble::rownames_to_column('umi')
+
+contrast <- labels |>
+  dplyr::mutate(seen = 1) |> 
+  pivot_wider(names_from = reclass.PSLDA.class, values_from = seen, values_fill = 0) |> 
+  dplyr::mutate(umi = NULL)
+
+
+features <- obj__diaz_2019__SF11136[celltype_markers |> dplyr::filter(celltype != "cell cycling") |> dplyr::pull(markers),]@assays$RNA@data |> 
+  as.data.frame() |> 
+  dplyr::select(labels$umi) |>
+  as.matrix() |> 
+  t() |> 
+  as.data.frame(stringsAsFactors=F) |> 
+  tibble::rownames_to_column('umi') |> 
+  assertr::verify(umi == labels$umi)|> 
+  tibble::column_to_rownames('umi')  
+
+
+counts <- obj__diaz_2019__SF11136[celltype_markers |> dplyr::filter(celltype != "cell cycling") |> dplyr::pull(markers),]@assays$RNA@counts |> 
+  as.data.frame() |> 
+  dplyr::select(labels$umi) |>
+  as.matrix() |> 
+  t() |> 
+  as.data.frame(stringsAsFactors=F) |> 
+  tibble::rownames_to_column('umi') |> 
+  assertr::verify(umi == labels$umi) |> 
+  tibble::column_to_rownames('umi')  
+
+
+# https://stats.stackexchange.com/questions/5135/interpretation-of-rs-lm-output
+out = pbapply::pbmapply(lmpred, features, counts, MoreArgs = list(contrast)) |> 
+  as.data.frame() |> 
+  t() |> 
+  as.data.frame()
+
+
+
+d <- cmdscale(dist(t(out)),eig=TRUE, k=2)
+
+plt <- d$points |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column('celltype')
+ggplot(plt, aes(x=V1, y=V2, label=celltype)) + 
+  geom_point() +
+  ggrepel::geom_text_repel()
+
+
+
+plt <- out |> 
+  tibble::rownames_to_column('gene') |> 
+  tidyr::pivot_longer(cols = -gene) |> 
+  dplyr::left_join(
+    celltype_markers, by=c('gene'='markers')
+  ) |> 
+  dplyr::mutate(rank = order(order(celltype, value)))
+
+ggplot(plt, aes(x = reorder(gene, rank), y = value, col=celltype)) +
+  geom_point() +
+  facet_grid(rows = vars(name)) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.45, hjust = 1)
+  )
+
+
+
+```
