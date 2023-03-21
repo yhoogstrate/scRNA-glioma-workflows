@@ -4,3 +4,4 @@
 .Ruserdata
 *.html
 /data
+.ipynb_checkpoints
