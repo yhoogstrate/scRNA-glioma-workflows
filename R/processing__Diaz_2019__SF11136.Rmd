@@ -177,7 +177,7 @@ set.seed(obj__diaz_2019__SF11136@misc$random.seed)
 obj__diaz_2019__SF11136 <- Seurat::RunPCA(
   reduction.key = "PC_",
   object = obj__diaz_2019__SF11136,
-  features = Seurat::VariableFeatures(object = obj__diaz_2019__SF11136),
+  features = obj__diaz_2019__SF11136@assays$RNA@var.features,
   verbose = F,
   seed.use = obj__diaz_2019__SF11136@misc$random.seed
 )

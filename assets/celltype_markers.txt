@@ -106,4 +106,11 @@ T-cell,GZMA
 T-cell,SKAP1
 T-cell,CD96
 T-cell,THEMIS
-T-cell,SLFN12L
+T-cell,SLFN12L,
+B-cell,IGLC3
+B-cell,CD19
+B-cell,CD79B
+fibroblast,CYP1B1
+fibroblast,OGN
+fibroblast,CLU
+fibroblast,CXCL12

@@ -2,3 +2,6 @@
 *.csv
 *.h5
 *.txt
+*.mtx
+*.csv
+*.tsv

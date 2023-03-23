@@ -4,7 +4,7 @@
 
 annotate_read_fractions <- function(seurat_object) {
   loop <- c("percentage_mitochondrial_reads" = "^MT-",
-    "percentage_ribosomal_reads" = "^RPL")
+    "percentage_ribosomal_reads" = "^(RPL|RPS|RP[0-9])")
   
   for(slot in names(loop)) {
     regex <- loop[[slot]]
@@ -20,7 +20,7 @@ annotate_read_fractions <- function(seurat_object) {
     
     reads_total <- Matrix::colSums(Seurat::GetAssayData(object = seurat_object, slot="counts"))
     reads_target <- Matrix::colSums(Seurat::GetAssayData(object = seurat_object, slot="counts")[target_features$status,])
-    
+
     seurat_object[[slot]] <- reads_target / reads_total * 100.0
   }
   
