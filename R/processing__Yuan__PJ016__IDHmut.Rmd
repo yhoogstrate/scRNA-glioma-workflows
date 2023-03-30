@@ -20,6 +20,7 @@ source("R/includes.R")
 ```{r}
 
 config <- list(
+  dataset = 'Yuan_GSE103224',
   sample_name = 'PJ016',
   sample_full_name = 'GSM2758471_PJ016',
   path = "data/GSE103224_Yuan/GSM2758471_PJ016/",

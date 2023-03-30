@@ -8,10 +8,14 @@ cache_seurat_object <- function(object) {
     object@misc$git_revision <- system("git rev-parse --short HEAD", intern = TRUE)
 
     fn <- paste0("cache/",
+                 object@misc$dataset,
+                 "__",
                  object@misc$sample_name,
                  "__",
                  object@misc$git_branch,
-                 ".Rds")
+                 "__[",
+                 object@misc$tumor.type,
+                 "].Rds")
     
     saveRDS(object, file=fn)
     
