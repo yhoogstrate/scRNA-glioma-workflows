@@ -39,7 +39,7 @@ config <- list(
   
   cluster.resolution = 1.2,
   
-  tumor.type = 'Astrocytoma, IDH-mut'
+  tumor_type = 'Astrocytoma, IDH-mut'
 )
 
 

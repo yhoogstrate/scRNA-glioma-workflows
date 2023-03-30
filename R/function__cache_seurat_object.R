@@ -1,12 +1,28 @@
 #!/usr/bin/env R
 
 cache_seurat_object <- function(object) {
-  
+  if(is.na(object@misc$dataset)) {
+    error("dataset slot not found in config")
+  }
+
+  if(is.na(object@misc$sample_name)) {
+    error("sample_name slot not found in config")
+  }
+
+  if(is.na(object@misc$tumor_type)) {
+    error("tumor_type slot not found in config")
+  } else {
+    tumor_type <- dplyr::recode(object@misc$tumor_type,
+                                `Astrocytoma, IDH-mut` = 'A_IDH',
+                                `Oligodendroglioma` = 'O_IDH',
+                                `Glioblastoma` = 'GBM')
+  }
+
   # ensure all code was committed
   if(length(system("git status --short", intern = TRUE)) == 0) {
     object@misc$git_branch <- system("git branch --show-current", intern = TRUE)
     object@misc$git_revision <- system("git rev-parse --short HEAD", intern = TRUE)
-
+    
     fn <- paste0("cache/",
                  object@misc$dataset,
                  "__",
@@ -14,7 +30,7 @@ cache_seurat_object <- function(object) {
                  "__",
                  object@misc$git_branch,
                  "__[",
-                 object@misc$tumor.type,
+                 tumor_type,
                  "].Rds")
     
     saveRDS(object, file=fn)
