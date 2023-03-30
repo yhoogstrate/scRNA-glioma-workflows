@@ -13,8 +13,8 @@ cache_seurat_object <- function(object) {
     error("tumor_type slot not found in config")
   } else {
     tumor_type <- dplyr::recode(object@misc$tumor_type,
-                                `Astrocytoma, IDH-mut` = 'A_IDH',
-                                `Oligodendroglioma` = 'O_IDH',
+                                `Astrocytoma, IDH-mut` = 'A-IDH',
+                                `Oligodendroglioma` = 'O-IDH',
                                 `Glioblastoma` = 'GBM')
   }
 
@@ -27,11 +27,11 @@ cache_seurat_object <- function(object) {
                  object@misc$dataset,
                  "__",
                  object@misc$sample_name,
-                 "__",
-                 object@misc$git_branch,
                  "__[",
                  tumor_type,
-                 "].Rds")
+                 "]__",
+                 object@misc$git_branch,
+                 ".Rds")
     
     saveRDS(object, file=fn)
     
