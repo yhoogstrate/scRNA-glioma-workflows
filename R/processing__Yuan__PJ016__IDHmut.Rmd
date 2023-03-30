@@ -20,7 +20,7 @@ source("R/includes.R")
 ```{r}
 
 config <- list(
-  dataset = 'Yuan [GSE103224]',
+  dataset = 'Yuan [GSE103224',
   sample_name = 'PJ016',
   sample_full_name = 'GSM2758471_PJ016',
   path = "data/GSE103224_Yuan/GSM2758471_PJ016/",
@@ -306,8 +306,8 @@ Seurat::FeaturePlot(obj__yuan__PJ016,
 ```
 
 ```{r}
-m <- Seurat::FindMarkers(obj__yuan__PJ016, ident.1 =c(2,0,6,1,4), ident.2=c(7,10,11,8,5,9))
-head(m,n=25)
+# m <- Seurat::FindMarkers(obj__yuan__PJ016, ident.1 =c(2,0,6,1,4), ident.2=c(7,10,11,8,5,9))
+# head(m,n=25)
 
 # Astro-program
 Seurat::FeaturePlot(obj__yuan__PJ016, features=c("APOE"))
@@ -315,8 +315,8 @@ Seurat::FeaturePlot(obj__yuan__PJ016, features=c("APOE"))
 # Stemness-program
 Seurat::FeaturePlot(obj__yuan__PJ016, features=c("SOX4","DCX","IGFBPL1","SOX11","TCF4","NREP","RND3","CCND2","MIAT","CAMK2N1","STMN4","STMN1","MYT1L","HN1","RNF122","PROX1","KLHDC8A"))
 
-m.12 <- Seurat::FindMarkers(obj__yuan__PJ016, ident.1 =c(12))
-head(m.12,n=25)
+# m.12 <- Seurat::FindMarkers(obj__yuan__PJ016, ident.1 =c(12))
+# head(m.12,n=25)
 ```
 
 
