@@ -333,7 +333,7 @@ Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6
 
 ```
 
-### Oligo-program ----
+### Oligo-program
 
 ```{r, find}
 Seurat::FeaturePlot(obj__yuan__PJ016,
@@ -345,7 +345,7 @@ Seurat::FeaturePlot(obj__yuan__PJ016,
 
 
 
-### Astro-program ----
+### Astro-program
 
 ```{r, find}
 Seurat::FeaturePlot(obj__yuan__PJ016,
@@ -370,7 +370,7 @@ Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6
 
 
 
-### Stemness-program ----
+### Stemness-program
 
 ```{r, find}
 Seurat::FeaturePlot(obj__yuan__PJ016,

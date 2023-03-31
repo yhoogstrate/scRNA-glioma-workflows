@@ -294,7 +294,8 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
 )
 
 
-obj__diaz_2019__SF11136$celltype_annotated = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(7,1,2,0,6,9,12),"oligodendrocyte",obj__diaz_2019__SF11136$celltype_annotated)
+obj__diaz_2019__SF11136$celltype_annotated = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% c(7,1,3,0,6,9),"oligodendrocyte",obj__diaz_2019__SF11136$celltype_annotated)
+# suspect that 12 is oligo-like tumor cells while the others are oligodendrocytes (PTPRZ1 negatiev)
 
 
 Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
@@ -308,7 +309,7 @@ Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.si
 
 Seurat::FeaturePlot(obj__diaz_2019__SF11136,
   reduction = "umap",
-  features = c('CD44'),
+  features = c('CD44','PTPRZ1'),
   label=T
 )
 
@@ -326,11 +327,84 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
 
 ```{r}
 obj__diaz_2019__SF11136$celltype_annotated = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% 
-                                            c(4, 8, 5,  3),
+                                            c(5,8,4 ,    2),
                                           "tumor",obj__diaz_2019__SF11136$celltype_annotated)
 
 
 Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
+
+```
+
+### Oligo-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Oligo.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+```
+
+
+
+### Astro-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Astro.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+```
+
+
+```{r, set and confirm}
+obj__diaz_2019__SF11136$celltype_annotated_venteicher = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% 
+                                            c(2),
+                                          "Astro. program",obj__diaz_2019__SF11136$celltype_annotated_venteicher)
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
+
+
+### Stemness-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__diaz_2019__SF11136,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Stemness.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T,
+  order=T
+)
+```
+
+
+```{r, set and confirm}
+obj__diaz_2019__SF11136$celltype_annotated_venteicher = ifelse(obj__diaz_2019__SF11136$seurat_clusters %in% 
+                                            c(4,5,8),
+                                          "Stemness. program",obj__diaz_2019__SF11136$celltype_annotated_venteicher)
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
+
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
 
 ```
 
@@ -460,7 +534,6 @@ Seurat::FeaturePlot(obj__diaz_2019__SF11136,
   label=T
 )
 ```
-
 
 
 ## T-cell
