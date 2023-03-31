@@ -54,7 +54,7 @@ obj__yuan__PJ016 <- Seurat::Read10X(
 
 obj__yuan__PJ016@misc <- config
 obj__yuan__PJ016$celltype.annotated <- NA
-obj__yuan__PJ016$celltype.annotated.venteicher <- NA
+obj__yuan__PJ016$celltype_annotated_venteicher <- NA
 
 
 
@@ -67,6 +67,8 @@ obj__yuan__PJ016@misc$reclass.PSLDA.min.scores <- list(
   'T-cell' = 0
 )
 
+
+check_config(obj__yuan__PJ016)
 
 rm(config)
 
@@ -355,14 +357,14 @@ Seurat::FeaturePlot(obj__yuan__PJ016,
 
 
 ```{r, set and confirm}
-obj__yuan__PJ016$celltype.annotated.venteicher = ifelse(obj__yuan__PJ016$seurat_clusters %in% 
+obj__yuan__PJ016$celltype_annotated_venteicher = ifelse(obj__yuan__PJ016$seurat_clusters %in% 
                                             c(3,0,2,6,1,4),
-                                          "Astro. program",obj__yuan__PJ016$celltype.annotated.venteicher)
+                                          "Astro. program",obj__yuan__PJ016$celltype_annotated_venteicher)
 ```
 
 
 ```{r, show}
-Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated.venteicher")
+Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
 
 ```
 
@@ -380,14 +382,14 @@ Seurat::FeaturePlot(obj__yuan__PJ016,
 
 
 ```{r, set and confirm}
-obj__yuan__PJ016$celltype.annotated.venteicher = ifelse(obj__yuan__PJ016$seurat_clusters %in% 
+obj__yuan__PJ016$celltype_annotated_venteicher = ifelse(obj__yuan__PJ016$seurat_clusters %in% 
                                             c(7, 10, 11, 5, 8 ,9),
-                                          "Stemness. program",obj__yuan__PJ016$celltype.annotated.venteicher)
+                                          "Stemness. program",obj__yuan__PJ016$celltype_annotated_venteicher)
 ```
 
 
 ```{r, show}
-Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated.venteicher")
+Seurat::DimPlot(obj__yuan__PJ016, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
 
 ```
 
