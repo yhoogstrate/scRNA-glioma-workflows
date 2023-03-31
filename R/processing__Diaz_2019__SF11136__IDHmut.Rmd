@@ -20,7 +20,7 @@ source("R/includes.R")
 ```{r}
 
 config <- list(
-  dataset = 'Diaz 2019 [GSE138794_Diaz]',
+  dataset = 'Diaz 2019 [GSE138794]',
   sample_name = 'SF11136',
   sample_full_name = 'GSM4119535_SF11136_LGG',
   path = "data/GSE138794_Diaz/scRNA_GSM4119535_SF11136_LGG/",
@@ -399,7 +399,6 @@ Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.si
 
 ```{r, show}
 Seurat::DimPlot(obj__diaz_2019__SF11136, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
-
 ```
 
 
