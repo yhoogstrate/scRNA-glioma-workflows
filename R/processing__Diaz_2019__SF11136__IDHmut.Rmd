@@ -1,5 +1,5 @@
 ---
-title: "scRNA-glioma-workflows: van Hijfte dataset - Sample Y"
+title: "scRNA-glioma-workflows: Diaz (2019) - SF11136"
 author: 
   - Youri Hoogstrate
   - Levi van Hijfte
