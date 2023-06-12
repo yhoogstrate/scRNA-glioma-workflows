@@ -353,7 +353,7 @@ Seurat::FeaturePlot(obj__van_hijfte__sample_y,
 obj__van_hijfte__sample_y$celltype = ifelse(obj__van_hijfte__sample_y$seurat_clusters %in% c(24),"astrocyte",obj__van_hijfte__sample_y$celltype)
 
 
-DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
+Seurat::DimPlot(obj__van_hijfte__sample_y, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype")
 
 ```
 
@@ -2278,4 +2278,18 @@ scripts/scRNA_analyses_Yuan.R:FeaturePlot(object = object_1, features = "CD248")
 
 ```
 
+
+```{r}
+obj__van_hijfte__sample_y$celltype <- ifelse(is.na(obj__van_hijfte__sample_y$celltype),"N/A",obj__van_hijfte__sample_y$celltype)
+
+Seurat::DimPlot(obj__van_hijfte__sample_y)
+Seurat::FeaturePlot(obj__van_hijfte__sample_y, features=c('RBFOX3'))
+
+Seurat::DotPlot(obj__van_hijfte__sample_y, features=list('neuron-marker'=c('RBFOX3'),
+                                                         'NEU'=c('ADCY1','GRIA3','STX1A','SYN1','PCLO','PAK3','LRRC4','ARHGAP35'),
+                                                         'NES'=c('KIN','CHEK2','MCMBP','EEF2K','HIRA')), group.by = "seurat_clusters")
+
+
+
+```
 

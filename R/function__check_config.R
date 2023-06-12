@@ -6,6 +6,8 @@ check_config <- function(seurat_obj) {
   stopifnot(!is.null(seurat_obj@misc$sample_full_name))
   stopifnot(!is.null(seurat_obj@misc$tumor_type))
   
+  stopifnot(!is.null(seurat_obj@misc$seurat.min.cells))
+  stopifnot(!is.null(seurat_obj@misc$seurat.min.features))
 
   stopifnot(!is.null(seurat_obj@misc$max.percentage.mitochondrial))
 

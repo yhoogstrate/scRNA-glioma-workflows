@@ -1,0 +1,684 @@
+---
+title: "scRNA-glioma-workflows: van Hijfte dataset AC - PR 1 - 3"
+author: 
+  - Youri Hoogstrate
+  - Levi van Hijfte
+  - Santoesha A. Ghisai
+date: "`r BiocStyle::doc_date()`"
+---
+
+# Load libraries and functions
+
+```{r}
+source("R/includes.R")
+```
+
+
+# Import data & set config
+
+```{r}
+
+config <- list(
+  dataset = 'van Hijfte AC',
+  sample_name = 'van Hijfte AC - 3PR',
+  sample_full_name = 'van Hijfte Actrocytoma - 3 primary - recurrent pairs',
+  path = "data/Glimmunology/LGG_project/data_analysis/GLASS/",
+  
+  random.seed = 42, # don't ask me but you can guess why, its Seurats default
+  
+  seurat.min.cells = 3,
+  seurat.min.features = 200,
+  
+  seurat.vst.nfeatures = 2000,
+  
+  min.nFeature_RNA = 0, # pre-filtered data
+  min.nCount_RNA = 0, # pre-filtered data
+  
+  pca.informative.components = 19,
+  
+  cluster.resolution = 1.2,
+  
+  tumor_type = 'Astrocytoma, IDH-mut'
+)
+
+
+obj__van_hijfte__3pr <- readRDS("/home/r361003/mnt/neuro-genomic-1-ro/Glimmunology/LGG_project/data_analysis/GLASS/3PR.RDS")
+DefaultAssay(obj__van_hijfte__3pr) = "SCT"
+
+
+obj__van_hijfte__3pr@misc <- config
+obj__van_hijfte__3pr$celltype.annotated <- NA
+obj__van_hijfte__3pr$celltype_annotated_venteicher <- NA
+
+
+
+obj__van_hijfte__3pr@misc$reclass.PSLDA.min.scores <- list(
+  'oligodendrocyte' = 0.365,
+  'tumor' = 0.33,
+  'neuron' = 0,
+  'endothelial' = 0,
+  'pericyte' = 0.22,
+  'T-cell' = 0
+)
+
+
+#check_config(obj__van_hijfte__3pr) - does not comply with standards
+
+rm(config)
+
+set.seed(obj__van_hijfte__3pr@misc$random.seed)
+stopifnot(.Random.seed[1] == 10403) # I guess this is some universal thing?
+```
+
+
+
+# Annotate cells manually
+
+## TAM
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "TAM") |> 
+    dplyr::filter(markers %in% rownames(obj__van_hijfte__3pr)) |> 
+    dplyr::pull(markers)
+  ,   label=T, min.cutoff = 0
+)
+
+
+tst <- Seurat::AddModuleScore(obj__van_hijfte__3pr,
+    features = list( "CD163" , "P2RY12" , "SLC11A1" ),
+    name = "celltype_TAM_markers"
+)
+
+
+
+```
+
+
+```{r, set}
+obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(22, 3, 12,  18),
+                                          "TAM",obj__van_hijfte__3pr$celltype.annotated)
+```
+
+```{r, show}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+
+## oligodendrocyte
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "oligodendrocyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T
+)
+```
+
+```{r}
+obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(24, 13,19),"oligodendrocyte",obj__van_hijfte__3pr$celltype.annotated)
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+
+## neurons
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "neuron") |> 
+    dplyr::pull(markers),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+```{r}
+obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(25, 26),"neuron",obj__van_hijfte__3pr$celltype.annotated)
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+
+## astrocyte
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "astrocyte") |> 
+    dplyr::pull(markers),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+```{r}
+obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(27),"astrocyte",obj__van_hijfte__3pr$celltype.annotated)
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+
+## OPC
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "OPC") |> 
+    dplyr::pull(markers),
+  label=T, min.cutoff=0, order=T
+)
+```
+
+
+
+```{r}
+#obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype.annotated)
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+## fibroblasts
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "fibroblast") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+    label=T, min.cutoff= 0, order=T
+)
+```
+
+
+
+```{r}
+#obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype.annotated)
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+
+## tumor
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "tumor") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T, min.cutoff= 0, order=T
+)
+```
+
+```{r}
+# m <- Seurat::FindMarkers(obj__van_hijfte__3pr, ident.1 =c(2,0,6,1,4), ident.2=c(7,10,11,8,5,9))
+# head(m,n=25)
+
+# Astro-program
+Seurat::FeaturePlot(obj__van_hijfte__3pr, features=c("APOE"))
+
+# Stemness-program
+Seurat::FeaturePlot(obj__van_hijfte__3pr, features=c("SOX4","DCX","IGFBPL1","SOX11","TCF4","NREP","RND3","CCND2","MIAT","CAMK2N1","STMN4","STMN1","MYT1L","HN1","RNF122","PROX1","KLHDC8A"))
+
+# m.12 <- Seurat::FindMarkers(obj__van_hijfte__3pr, ident.1 =c(12))
+# head(m.12,n=25)
+```
+
+
+```{r, set}
+obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(2,6,14,0,5,23,20,15,16,17,10,1,21,7,9,8,11,4),
+                                          "tumor",obj__van_hijfte__3pr$celltype.annotated)
+```
+
+```{r, show}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+
+```
+
+### Oligo-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Oligo.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+```
+
+
+
+### Astro-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Astro.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+```
+
+
+```{r, set and confirm}
+obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(3,0,2,6,1,4),
+                                          "Astro. program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
+
+
+### Stemness-program
+
+```{r, find}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Stemness.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+```
+
+
+```{r, set and confirm}
+obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(7, 10, 11, 5, 8 ,9),
+                                          "Stemness. program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+```
+
+
+```{r, show}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
+
+
+## endothelial & pericytes
+
+```{r}
+tmp <- obj__van_hijfte__3pr[,obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] > 6 & obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,2] < -4]
+```
+
+
+
+```{r}
+Seurat::FeaturePlot(tmp,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "endothelial") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+```{r}
+Seurat::FeaturePlot(tmp,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "endothelial_and_pericyte") |> 
+    dplyr::pull(markers) |> 
+    head(n = 10),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+```{r}
+Seurat::FeaturePlot(tmp,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "pericyte") |> 
+    dplyr::pull(markers),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+
+```{r, set}
+
+
+obj__van_hijfte__3pr$celltype.annotated = ifelse(
+  obj__van_hijfte__3pr$seurat_clusters %in% c(28) & 
+  obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] >= 10
+                                                   ,"endothelial",obj__van_hijfte__3pr$celltype.annotated)
+
+obj__van_hijfte__3pr$celltype.annotated = ifelse(
+  obj__van_hijfte__3pr$seurat_clusters %in% c(28) & 
+  obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] < 10
+                                                   ,"pericyte",obj__van_hijfte__3pr$celltype.annotated)
+
+```
+
+
+```{r}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+```
+
+
+
+
+## T-cell
+
+```{r}
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers |>
+    dplyr::filter(celltype == "T-cell") |> 
+    dplyr::pull(markers) |> 
+    head(n = 4),
+  label=T, min.cutoff = 0, order=T
+)
+```
+
+
+## Find remaining
+
+```{r, C3}
+m.3 <- Seurat::FindMarkers(obj__van_hijfte__3pr, ident.1 = 3)
+head(m.3, n=25)
+```
+LINC01088  0.000000e+00  2.8359079 0.956 0.026  0.000000e+00
+ID4        0.000000e+00  3.0104386 0.973 0.040  0.000000e+00
+EDNRB      0.000000e+00  2.5992103 0.938 0.025  0.000000e+00
+SLC14A1    0.000000e+00  2.4181379 0.867 0.010  0.000000e+00
+GJA1      1.429890e-300  3.5274009 0.894 0.031 2.140688e-296
+SLC4A4    3.452693e-297  1.5680509 0.788 0.009 5.169027e-293
+MGST1     1.176369e-294  1.7258641 0.779 0.008 1.761143e-290
+LIX1      5.225919e-291  2.2180284 0.903 0.036 7.823723e-287
+KCNN3     6.270610e-287  2.5730555 0.956 0.055 9.387730e-283
+GPX3      3.004531e-282  3.1248437 0.929 0.050 4.498084e-278
+MLC1      1.116737e-281  1.1081215 0.739 0.006 1.671866e-277
+TMEM47    1.101784e-280  1.2469523 0.783 0.014 1.649481e-276
+PLTP      9.259567e-272  1.7297954 0.867 0.034 1.386250e-267
+AHNAK     1.655813e-267  1.5683290 0.872 0.034 2.478918e-263
+S100A10   4.050418e-266  1.8971748 0.841 0.028 6.063881e-262
+CD44      1.687907e-263  1.4189226 0.748 0.013 2.526965e-259
+FAT3      7.289679e-263  1.1665198 0.735 0.013 1.091338e-258
+SYTL4     7.397852e-259  1.6696984 0.916 0.058 1.107532e-254
+TIMP3     1.566364e-253  1.9716725 0.898 0.050 2.345003e-249
+CCDC80    2.290070e-248  1.0942316 0.681 0.009 3.428464e-244
+PRLHR     7.525860e-247  1.3467037 0.765 0.025 1.126696e-242
+CD99      1.292866e-246  3.0201008 0.996 0.109 1.935550e-242
+NMB       1.921961e-245  4.0598647 0.951 0.091 2.877368e-241
+BBOX1     3.804922e-244  0.8951846 0.637 0.004 5.696349e-240
+EFEMP1    2.213013e-242  1.1109420 0.695 0.013 3.313102e-238
+
+
+
+
+```{r, C11}
+m.11 <- Seurat::FindMarkers(obj__van_hijfte__3pr, ident.1 = 11)
+head(m.11, n=25)
+```
+
+
+C1orf64  0.000000e+00  2.6756108 0.966 0.004  0.000000e+00
+CDA      0.000000e+00  2.0107801 0.897 0.001  0.000000e+00
+ADGRL4   0.000000e+00  1.8100046 0.828 0.001  0.000000e+00
+CD34     0.000000e+00  1.5085390 0.862 0.001  0.000000e+00
+ABCG2    0.000000e+00  3.0857655 1.000 0.005  0.000000e+00
+ECSCR.1  0.000000e+00  1.3821448 0.793 0.001  0.000000e+00
+DSP      0.000000e+00  0.8981521 0.759 0.000  0.000000e+00
+ADGRF5   0.000000e+00  2.3632485 0.897 0.001  0.000000e+00
+ABCB1    0.000000e+00  2.0047367 0.931 0.002  0.000000e+00
+GIMAP7   0.000000e+00  1.2135070 0.862 0.001  0.000000e+00
+GIMAP4   0.000000e+00  1.0532409 0.793 0.001  0.000000e+00
+FLI1     0.000000e+00  1.1648225 0.862 0.002  0.000000e+00
+ACVRL1   0.000000e+00  1.3625433 0.793 0.001  0.000000e+00
+ATP10A   0.000000e+00  2.0513104 0.862 0.001  0.000000e+00
+CGNL1    0.000000e+00  1.3298371 0.828 0.002  0.000000e+00
+TMEM204  0.000000e+00  2.4958926 0.966 0.003  0.000000e+00
+ICAM2    0.000000e+00  1.6439675 0.897 0.003  0.000000e+00
+PCAT19   0.000000e+00  2.1880319 0.966 0.001  0.000000e+00
+GGT5     0.000000e+00  2.4167906 1.000 0.005  0.000000e+00
+ERG      0.000000e+00  1.5592281 0.862 0.000  0.000000e+00
+PALMD   1.509625e-304  1.6576171 0.862 0.003 2.260059e-300
+TM4SF1  5.269190e-304  2.3132205 0.931 0.004 7.888504e-300
+SDPR    3.984029e-302  3.2381741 1.000 0.006 5.964490e-298
+MECOM   5.141079e-297  1.2156861 0.793 0.002 7.696709e-293
+TGM2    2.186670e-295  2.0348884 0.862 0.003 3.273664e-291
+
+
+
+## Visualize
+
+
+
+```{r}
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+```
+
+
+
+# Annotate componentents and/or clusters
+
+```{r}
+
+
+df <- -log10(geneset_component_associations(
+  obj__van_hijfte__3pr, 
+  celltype_markers, 
+  obj__van_hijfte__3pr@misc$pca.informative.components
+  ))
+
+plt <- df |>
+  tibble::rownames_to_column('PC')  |> 
+  dplyr::mutate(order = as.numeric(gsub("^PC", "", PC))) |> 
+  tidyr::pivot_longer(cols = -c('PC', 'order'), names_to = 'celltype') |> 
+  dplyr::mutate(alpha = value > -log10(0.01))
+
+
+ggplot(plt, aes(x=reorder(PC, order), y=value, fill=celltype, alpha=alpha)) +
+  geom_bar(stat = "identity", position = "stack")
+
+```
+
+
+```{r}
+ee <- data.frame()
+for (pc in 1:34) {
+  obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc]
+
+  t <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "tumor"]
+  
+  tam <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "TAM"]
+  
+  pe <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "pericyte"]
+  
+  en <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "endothelial"]
+
+    ne <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "neuron"]
+    
+  tc <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "T-cell"]
+  od <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "oligodendrocyte"]
+  ac <- obj__van_hijfte__3pr@reductions$pca@cell.embeddings[, pc:pc][obj__van_hijfte__3pr$celltype == "astrocyte"]
+
+  stats.t <- c(
+    t.test(t, tam)$statistic,
+    t.test(t, pe)$statistic,
+    t.test(t, en)$statistic,
+    t.test(t, ne)$statistic,
+    t.test(t, tc)$statistic,
+    t.test(t, od)$statistic,
+    t.test(t, ac)$statistic
+  )
+
+  stats.tam <- c(
+    t.test(tam, t)$statistic,
+    t.test(tam, pe)$statistic,
+    t.test(tam, en)$statistic,
+    t.test(tam, ne)$statistic,
+    t.test(tam, tc)$statistic,
+    t.test(tam, od)$statistic,
+    t.test(tam, ac)$statistic
+  )
+
+  stats.pe <- c(
+    t.test(pe, t)$statistic,
+    t.test(pe, tam)$statistic,
+    t.test(pe, en)$statistic,
+    t.test(pe, ne)$statistic,
+    t.test(pe, tc)$statistic,
+    t.test(pe, od)$statistic,
+    t.test(pe, ac)$statistic
+  )
+
+  stats.en <- c(
+    t.test(en, t)$statistic,
+    t.test(en, tam)$statistic,
+    t.test(en, pe)$statistic,
+    t.test(en, ne)$statistic,
+    t.test(en, tc)$statistic,
+    t.test(en, od)$statistic,
+    t.test(en, ac)$statistic
+  )
+  
+    stats.tc <- c(
+    t.test(tc, t)$statistic,
+    t.test(tc, tam)$statistic,
+    t.test(tc, pe)$statistic,
+    t.test(tc, ne)$statistic,
+    t.test(tc, en)$statistic,
+    t.test(tc, od)$statistic,
+    t.test(tc, ac)$statistic
+  )
+    
+      
+    stats.ne <- c(
+    t.test(ne, t)$statistic,
+    t.test(ne, tam)$statistic,
+    t.test(ne, pe)$statistic,
+    t.test(ne, tc)$statistic,
+    t.test(ne, en)$statistic,
+    t.test(ne, od)$statistic,
+    t.test(ne, ac)$statistic
+  )
+    
+          
+    stats.od <- c(
+    t.test(od, t)$statistic,
+    t.test(od, tam)$statistic,
+    t.test(od, pe)$statistic,
+    t.test(od, tc)$statistic,
+    t.test(od, en)$statistic,
+    t.test(od, ne)$statistic,
+    t.test(od, ac)$statistic
+  )
+          
+    stats.ac <- c(
+    t.test(ac, t)$statistic,
+    t.test(ac, tam)$statistic,
+    t.test(ac, pe)$statistic,
+    t.test(ac, tc)$statistic,
+    t.test(ac, en)$statistic,
+    t.test(ac, ne)$statistic,
+    t.test(ac, od)$statistic
+  )
+
+
+  ee <- rbind(
+    ee,
+    data.frame(
+      pc = pc,
+      assoc.t = sqrt(sum(stats.t^2)) ,
+      assoc.tam = sqrt(sum(stats.tam^2)) ,
+      assoc.pe = sqrt(sum(stats.pe^2)) ,
+      assoc.en = sqrt(sum(stats.en^2)) ,
+      assoc.tc = sqrt(sum(stats.tc^2)) ,
+      assoc.ne = sqrt(sum(stats.ne^2)) ,
+      assoc.od = sqrt(sum(stats.od^2)) ,
+      assoc.ac = sqrt(sum(stats.ac^2)) 
+    )
+  )
+}
+
+ee
+
+plt <- ee |> 
+  tidyr::pivot_longer(-c('pc'))
+
+
+ggplot(plt, aes(x=pc, y=value,fill=name)) + 
+    geom_bar(stat = "identity", position = "fill")
+
+
+```
+
+
+## PC1
+```{r}
+Seurat::Idents(obj__van_hijfte__3pr) <- "celltype.annotated"
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = c("PCinv_1", "PC_1"),
+  label = T,
+  cols = c("red", "lightgrey", "blue")
+)
+Seurat::Idents(obj__van_hijfte__3pr) <- "seurat_clusters"
+```
+
+
+
+# re-classification using markers
+https://machinelearningmastery.com/linear-classification-in-r/
+
+## LM https://topepo.github.io/caret/measuring-performance.html
+## LDA
+## LDA + PCA
+## PSLDA
+### min classifier scores
+
+#### PE
+
+
+#### OD
+
+
+
+#### T
+
+
+
+## SVM 
+
+
+## SVM + PCA
+
+
+
+
+
+# Store object
+
+## Check git code changes and save
+
+```{r}
+cache_seurat_object(obj__van_hijfte__3pr)
+```
+
+
+
+
+# Visualizations
