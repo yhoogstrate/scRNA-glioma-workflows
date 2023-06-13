@@ -43,11 +43,11 @@ config <- list(
 
 
 obj__van_hijfte__3pr <- readRDS("/home/r361003/mnt/neuro-genomic-1-ro/Glimmunology/LGG_project/data_analysis/GLASS/3PR.RDS")
-DefaultAssay(obj__van_hijfte__3pr) = "SCT"
+Seurat::DefaultAssay(obj__van_hijfte__3pr) <- "SCT"
 
 
 obj__van_hijfte__3pr@misc <- config
-obj__van_hijfte__3pr$celltype.annotated <- NA
+obj__van_hijfte__3pr$celltype_annotated <- NA
 obj__van_hijfte__3pr$celltype_annotated_venteicher <- NA
 
 
@@ -98,13 +98,13 @@ tst <- Seurat::AddModuleScore(obj__van_hijfte__3pr,
 
 
 ```{r, set}
-obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
                                             c(22, 3, 12,  18),
-                                          "TAM",obj__van_hijfte__3pr$celltype.annotated)
+                                          "TAM",obj__van_hijfte__3pr$celltype_annotated)
 ```
 
 ```{r, show}
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -123,9 +123,9 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 ```
 
 ```{r}
-obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(24, 13,19),"oligodendrocyte",obj__van_hijfte__3pr$celltype.annotated)
+obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(24, 13,19),"oligodendrocyte",obj__van_hijfte__3pr$celltype_annotated)
 
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -143,9 +143,9 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 ```
 
 ```{r}
-obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(25, 26),"neuron",obj__van_hijfte__3pr$celltype.annotated)
+obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(25, 26),"neuron",obj__van_hijfte__3pr$celltype_annotated)
 
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -163,9 +163,9 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 ```
 
 ```{r}
-obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(27),"astrocyte",obj__van_hijfte__3pr$celltype.annotated)
+obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(27),"astrocyte",obj__van_hijfte__3pr$celltype_annotated)
 
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -185,9 +185,9 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 
 
 ```{r}
-#obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype.annotated)
+#obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype_annotated)
 
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -207,9 +207,9 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 
 
 ```{r}
-#obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype.annotated)
+#obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% c(),"OPC",obj__van_hijfte__3pr$celltype_annotated)
 
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -243,13 +243,15 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr, features=c("SOX4","DCX","IGFBPL1","SOX
 
 
 ```{r, set}
-obj__van_hijfte__3pr$celltype.annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+
+obj__van_hijfte__3pr$celltype_annotated = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
                                             c(2,6,14,0,5,23,20,15,16,17,10,1,21,7,9,8,11,4),
-                                          "tumor",obj__van_hijfte__3pr$celltype.annotated)
+                                          "tumor",obj__van_hijfte__3pr$celltype_annotated)
+
 ```
 
 ```{r, show}
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 
 ```
 
@@ -264,30 +266,47 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 ```
 
 
+```{r, set and confirm}
+
+obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(2, 6, 14, 0),
+                                          "Oligo. program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
+```
+
+
+```{r, show}
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
 
 ### Astro-program
 
 ```{r, find}
 Seurat::FeaturePlot(obj__van_hijfte__3pr,
   reduction = "umap",
-  features = celltype_markers_Venteicher_IDHmut |> dplyr::filter(Astro.program) |>  head(n=8) |> dplyr::pull(gene_symbol),
-  label=T
+  features = c(celltype_markers_Venteicher_IDHmut |> dplyr::filter(Astro.program) |>  head(n=8) |> dplyr::pull(gene_symbol), "GABRG1"),
+  label=T, order = T
 )
 ```
 
 
 ```{r, set and confirm}
+
 obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
-                                            c(3,0,2,6,1,4),
+                                            c(8, 9, 11 ,4),
                                           "Astro. program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
 ```
 
 
 ```{r, show}
+
 Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
 
 ```
-
 
 
 ### Stemness-program
@@ -302,9 +321,10 @@ Seurat::FeaturePlot(obj__van_hijfte__3pr,
 
 
 ```{r, set and confirm}
+
 obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
-                                            c(7, 10, 11, 5, 8 ,9),
-                                          "Stemness. program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+                                            c(15), "Stemness.  program",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
 ```
 
 
@@ -313,6 +333,57 @@ Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size 
 
 ```
 
+### Cycling
+
+```{r, find}
+
+Seurat::FeaturePlot(obj__van_hijfte__3pr,
+  reduction = "umap",
+  features = celltype_markers_cell_cycle |>  head(n=8) |> dplyr::pull(gene_symbol),
+  label=T
+)
+
+```
+
+
+```{r, set and confirm}
+
+obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(23,5),
+                                          "Cycling",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
+# small part seems to be G2?
+#obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+#                                            c(20),
+#                                          "Cycling",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
+```
+
+
+```{r, show}
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
+
+### remaining
+
+undefined tumor states, though prominently present
+
+```{r}
+
+obj__van_hijfte__3pr$celltype_annotated_venteicher = ifelse(obj__van_hijfte__3pr$seurat_clusters %in% 
+                                            c(20,16,17,10,1,21,7),
+                                          "Remaining",obj__van_hijfte__3pr$celltype_annotated_venteicher)
+
+```
+
+
+```{r, show}
+
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated_venteicher")
+
+```
 
 
 ## endothelial & pericytes
@@ -320,7 +391,6 @@ Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size 
 ```{r}
 tmp <- obj__van_hijfte__3pr[,obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] > 6 & obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,2] < -4]
 ```
-
 
 
 ```{r}
@@ -359,21 +429,21 @@ Seurat::FeaturePlot(tmp,
 ```{r, set}
 
 
-obj__van_hijfte__3pr$celltype.annotated = ifelse(
+obj__van_hijfte__3pr$celltype_annotated = ifelse(
   obj__van_hijfte__3pr$seurat_clusters %in% c(28) & 
   obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] >= 10
-                                                   ,"endothelial",obj__van_hijfte__3pr$celltype.annotated)
+                                                   ,"endothelial",obj__van_hijfte__3pr$celltype_annotated)
 
-obj__van_hijfte__3pr$celltype.annotated = ifelse(
+obj__van_hijfte__3pr$celltype_annotated = ifelse(
   obj__van_hijfte__3pr$seurat_clusters %in% c(28) & 
   obj__van_hijfte__3pr@reductions$umap@cell.embeddings[,1] < 10
-                                                   ,"pericyte",obj__van_hijfte__3pr$celltype.annotated)
+                                                   ,"pericyte",obj__van_hijfte__3pr$celltype_annotated)
 
 ```
 
 
 ```{r}
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 ```
 
 
@@ -467,7 +537,7 @@ TGM2    2.186670e-295  2.0348884 0.862 0.003 3.273664e-291
 
 
 ```{r}
-Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype.annotated")
+Seurat::DimPlot(obj__van_hijfte__3pr, reduction = "umap", label = TRUE, pt.size = .6, group.by = "celltype_annotated")
 ```
 
 
@@ -629,7 +699,7 @@ ggplot(plt, aes(x=pc, y=value,fill=name)) +
 
 ## PC1
 ```{r}
-Seurat::Idents(obj__van_hijfte__3pr) <- "celltype.annotated"
+Seurat::Idents(obj__van_hijfte__3pr) <- "celltype_annotated"
 Seurat::FeaturePlot(obj__van_hijfte__3pr,
   reduction = "umap",
   features = c("PCinv_1", "PC_1"),
