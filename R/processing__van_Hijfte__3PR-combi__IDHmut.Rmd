@@ -745,7 +745,9 @@ https://machinelearningmastery.com/linear-classification-in-r/
 ## Check git code changes and save
 
 ```{r}
+
 cache_seurat_object(obj__van_hijfte__3pr)
+
 ```
 
 
